@@ -37,7 +37,8 @@ import {
   Utensils,
   MailCheck,
   QrCode,
-  RefreshCw
+  RefreshCw,
+  Megaphone
 } from 'lucide-react';
 
 import { 
@@ -53,6 +54,7 @@ import {
   Legend 
 } from 'recharts';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
+import { AdminAnnouncementsSection } from './AdminAnnouncementsSection';
 
 interface AdminDashboardProps {
   user: Omit<User, 'passwordHash'>;
@@ -775,6 +777,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <ClipboardList className="w-4 h-4" />
             <span>Co-ordinators</span>
+          </button>
+
+          <button
+            onClick={() => { SoundEngine.playClick(); setActiveTab('announcements'); }}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-tech font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'announcements'
+                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+            }`}
+          >
+            <Megaphone className="w-4 h-4" />
+            <span>Announcements</span>
           </button>
 
           <button
@@ -2574,6 +2588,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB: ANNOUNCEMENTS */}
+        {activeTab === 'announcements' && (
+          <AdminAnnouncementsSection
+            currentUser={user}
+            showToast={showToast}
+          />
         )}
 
         {/* TAB 11: PROFILE & TAB 12: SETTINGS */}

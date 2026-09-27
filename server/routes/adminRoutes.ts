@@ -9,6 +9,7 @@ import {
   getNotifications,
   sendNotification,
   deleteNotification,
+  getAdminAnnouncements,
   getSupportReports,
   createSupportReport,
   updateSupportReport,
@@ -34,6 +35,9 @@ router.get('/analytics', protect, authorize('coordinator', 'admin'), getSystemAn
 router.get('/notifications', protect, getNotifications);
 router.post('/notifications', protect, authorize('coordinator', 'admin'), sendNotification);
 router.delete('/notifications/:id', protect, authorize('admin'), deleteNotification);
+
+// Announcements (admin only)
+router.get('/announcements', protect, authorize('admin'), getAdminAnnouncements);
 
 // Support reports
 router.get('/reports', protect, getSupportReports);

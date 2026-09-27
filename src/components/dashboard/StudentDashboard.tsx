@@ -573,57 +573,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         )}
 
         {/* Top alerts if any */}
-        {registerSuccess && (
-          <div className="mb-6 p-4 rounded-2xl bg-emerald-950/70 border border-emerald-500/50 flex items-center justify-between animate-in slide-in-from-top-2">
-            <div className="flex items-center gap-3 text-emerald-200 text-sm">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span>{registerSuccess}</span>
-            </div>
-            <button
-              onClick={() => setActiveTab('registrations')}
-              className="text-xs font-mono font-bold uppercase underline text-emerald-300 cursor-pointer"
-            >
-              View My Passes
-            </button>
-          </div>
-        )}
-
-        {registerError && (
-          <div className="mb-6 p-4 rounded-2xl bg-red-950/70 border border-red-500/50 flex items-center gap-3 text-red-200 text-sm animate-in slide-in-from-top-2">
-            <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
-            <span>{registerError}</span>
-          </div>
-        )}
-
-        {/* Multi-Role Quick Switcher Banner */}
-        {availableRoles && availableRoles.length > 1 && onSwitchRole && (
-          <div className="mb-6 p-3 rounded-2xl bg-gradient-to-r from-pink-950/60 to-purple-950/60 border border-pink-800/40 flex flex-wrap items-center justify-between gap-3 text-xs backdrop-blur-md">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-pink-400 animate-pulse" />
-              <span className="font-mono text-pink-200">
-                Active Console: <strong className="text-white">Student / Participant View</strong>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono text-slate-400">Switch View:</span>
-              {availableRoles.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => onSwitchRole(r)}
-                  className={`px-3 py-1 rounded-xl text-xs font-tech font-bold uppercase transition-all cursor-pointer ${
-                    r === 'student'
-                      ? 'bg-pink-600 text-white shadow-md shadow-pink-600/30'
-                      : 'bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-purple-900/50'
-                  }`}
-                >
-                  {r === 'admin' ? '👑 Admin' : r === 'coordinator' ? '📋 Coordinator' : '🎓 Student'}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 1: DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
             {/* Hero Welcome banner with Campus Backdrop */}

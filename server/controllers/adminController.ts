@@ -354,6 +354,16 @@ export async function deleteNotification(req: AuthenticatedRequest, res: Respons
   }
 }
 
+// Announcements history: notifications dispatched by an administrator
+export async function getAdminAnnouncements(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const announcements = await Notification.find({ senderRole: 'admin' }).sort({ createdAt: -1 }).limit(100);
+    res.status(200).json({ success: true, announcements });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || 'Failed to fetch announcements.' });
+  }
+}
+
 // Support Reports: GET, POST, PUT, DELETE
 export async function getSupportReports(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {

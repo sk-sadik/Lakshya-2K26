@@ -798,6 +798,19 @@ export class DatabaseService {
     });
   }
 
+  public async getAdminAnnouncements(): Promise<NotificationItem[]> {
+    try {
+      const res = await fetch('/api/admin/announcements', { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        return data.announcements || [];
+      }
+    } catch {
+      // safe fallback
+    }
+    return [];
+  }
+
   // Support Reports
   public async getReports(): Promise<SupportReport[]> {
     try {
