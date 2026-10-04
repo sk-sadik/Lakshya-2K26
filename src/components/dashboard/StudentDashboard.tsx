@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, ManagedEvent, Registration, DepartmentId, NotificationItem, UserRole } from '../../types';
+import { User, ManagedEvent, Registration, DepartmentId, NotificationItem, UserRole, FoodCoupon } from '../../types';
 import { dbService } from '../../services/dbService';
 import { DEPARTMENTS } from '../../data/lakshyaData';
 import { SoundEngine } from '../AudioEngine';
@@ -31,6 +31,7 @@ import {
   X,
   QrCode,
   CreditCard,
+  Utensils,
 } from 'lucide-react';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 
@@ -48,6 +49,7 @@ type StudentTab =
   | 'dashboard'
   | 'all-events'
   | 'departments'
+  | 'food-passes'
   | 'upcoming'
   | 'registrations'
   | 'profile'
@@ -89,6 +91,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [selectedQrPass, setSelectedQrPass] = useState<Registration | null>(null);
   const [payingRegId, setPayingRegId] = useState<string | null>(null);
+  const [myCoupons, setMyCoupons] = useState<FoodCoupon[]>([]);
 
   // Registration details form (name + roll no + teammates) shown BEFORE payment
   const [registerFormEvent, setRegisterFormEvent] = useState<ManagedEvent | null>(null);
@@ -143,6 +146,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     setRegistrations(dbService.getRegistrations());
     const notifs = await dbService.getNotifications(user.id, 'student');
     setNotifications(notifs);
+    const passes = await dbService.getMyFoodCoupons();
+    setMyCoupons(passes);
     const evts = await dbService.syncEvents();
     if (evts && evts.length > 0) setEvents(evts);
     const regs = await dbService.syncRegistrations();
@@ -553,8 +558,26 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => { SoundEngine.playClick(); setActiveTab('profile'); }}
+            onClick={() => { SoundEngine.playClick(); setActiveTab('food-passes'); }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-tech font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'food-passes'
+                ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-600/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Utensils className="w-4 h-4" />
+              <span>My Food Passes</span>
+            </div>
+            {myCoupons.filter((c) => c.status === 'ACTIVE').length > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold">
+                {myCoupons.filter((c) => c.status === 'ACTIVE').length}
+              </span>
+            )}
+          </button>
 
+          <button
+            onClick={() => { SoundEngine.playClick(); setActiveTab('profile'); }}
             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-tech font-bold uppercase tracking-wider transition-all cursor-pointer ${
               activeTab === 'profile'
                 ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-600/20'
@@ -1247,6 +1270,89 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         )}
 
         {/* TAB 6: MY PROFILE */}
+        {/* TAB: MY FOOD PASSES (one pass per event registered, issued by each event's coordinator) */}
+        {activeTab === 'food-passes' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight flex items-center gap-2.5">
+                  <Utensils className="w-7 h-7 text-emerald-400" />
+                  My Food Passes ({myCoupons.length})
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                  One dining pass per event you registered for — issued by that event's coordinator. Show the code at the food court.
+                </p>
+              </div>
+              <button
+                onClick={() => reloadData()}
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-tech font-bold uppercase cursor-pointer border border-purple-900/40 self-start"
+              >
+                Refresh Passes
+              </button>
+            </div>
+
+            {myCoupons.length === 0 ? (
+              <div className="p-12 rounded-3xl bg-slate-950/80 border border-purple-900/40 text-center max-w-md mx-auto">
+                <Utensils className="w-12 h-12 mx-auto text-emerald-400 mb-3" />
+                <h3 className="text-lg font-bold text-white mb-1">No Food Passes Yet</h3>
+                <p className="text-xs text-slate-400 mb-5">
+                  Your event coordinators issue dining passes to registered participants. They will appear here once issued.
+                </p>
+                <button
+                  onClick={() => setActiveTab('all-events')}
+                  className="px-5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-tech font-bold uppercase tracking-wider"
+                >
+                  Explore Events
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {myCoupons.map((coupon) => (
+                  <div
+                    key={coupon.id || coupon.couponCode}
+                    className="p-5 rounded-3xl bg-slate-950/80 border border-emerald-900/40 space-y-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold uppercase border border-emerald-500/30">
+                        {coupon.eventName || 'General Pass'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                        coupon.status === 'ACTIVE'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                          : coupon.status === 'USED'
+                          ? 'bg-slate-500/20 text-slate-300 border border-slate-500/40'
+                          : 'bg-red-500/20 text-red-300 border border-red-500/40'
+                      }`}>
+                        {coupon.status}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-slate-900 border border-purple-900/40 text-center">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase block mb-1">Pass Code</span>
+                      <span className="font-mono text-base font-bold text-white tracking-wider wrap-anywhere">
+                        {coupon.couponCode}
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-400 space-y-1">
+                      <div>🍽️ {coupon.mealType}</div>
+                      <div>📍 {coupon.venue}</div>
+                      <div>
+                        ⏰ Valid till:{' '}
+                        {new Date(coupon.expiryDate).toLocaleString()}
+                      </div>
+                      {coupon.issuedBy && <div>👤 Issued by: {coupon.issuedBy}</div>}
+                      {coupon.status === 'USED' && coupon.redeemedAt && (
+                        <div className="text-emerald-400">
+                          ✓ Redeemed on {new Date(coupon.redeemedAt).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'profile' && (
           <div className="max-w-2xl space-y-6">
             <div>

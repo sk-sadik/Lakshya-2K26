@@ -145,6 +145,8 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
   const [sendingCouponId, setSendingCouponId] = useState<string | null>(null);
   const [emailAllEventId, setEmailAllEventId] = useState<string>('all');
   const [isEmailingAllCoupons, setIsEmailingAllCoupons] = useState(false);
+  const [genEventId, setGenEventId] = useState<string>('');
+  const [isGeneratingTokens, setIsGeneratingTokens] = useState(false);
 
   // Notifications & Reports (admin -> coordinators only)
   const [coordNotifications, setCoordNotifications] = useState<NotificationItem[]>([]);
@@ -1516,6 +1518,65 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
               </p>
             </div>
 
+            {/* Generate Passes For One Of My Events */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#0a1a33] via-slate-950 to-[#0a1526] border border-cyan-500/50 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 max-w-4xl space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-[11px] font-mono font-bold text-cyan-300">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  PER-EVENT ISSUANCE
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold text-white font-heading">
+                  Generate Food Passes for My Event
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Creates one dining pass per confirmed registrant of the selected event. A student in 3 events receives 3 passes — one from each coordinator. Already-issued passes are skipped automatically.
+                </p>
+
+                <div className="pt-1 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <select
+                    value={genEventId}
+                    onChange={(e) => setGenEventId(e.target.value)}
+                    className="px-4 py-3 rounded-2xl bg-slate-900 border border-cyan-900/60 text-white text-xs font-mono focus:outline-none focus:border-cyan-400 cursor-pointer"
+                  >
+                    <option value="">-- Select your event --</option>
+                    {allEvents.map((ev) => (
+                      <option key={ev.id} value={ev.id}>{ev.eventName}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={async () => {
+                      if (!genEventId) {
+                        setCouponActionFeedback({ type: 'error', text: 'Please select one of your events first.' });
+                        return;
+                      }
+                      setCouponActionFeedback(null);
+                      setIsGeneratingTokens(true);
+                      try {
+                        const res = await dbService.bulkGenerateTokensForEventParticipants(genEventId);
+                        SoundEngine.playSuccess();
+                        setCouponActionFeedback({ type: 'success', text: res.message });
+                        const cpnData = await dbService.getAllFoodCoupons();
+                        setCoordFoodCoupons(cpnData.coupons || []);
+                      } catch (err: any) {
+                        SoundEngine.playClick();
+                        setCouponActionFeedback({ type: 'error', text: err.message || 'Failed to generate passes.' });
+                      } finally {
+                        setIsGeneratingTokens(false);
+                      }
+                    }}
+                    disabled={isGeneratingTokens || !genEventId}
+                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 via-blue-600 to-purple-600 hover:from-cyan-500 hover:to-blue-500 text-white font-tech font-extrabold text-xs uppercase tracking-wider shadow-xl shadow-cyan-600/30 flex items-center gap-2.5 cursor-pointer disabled:opacity-50 transition-all hover:scale-[1.02]"
+                  >
+                    <Utensils className="w-4 h-4" />
+                    <span>{isGeneratingTokens ? 'Generating Passes...' : 'Generate Passes for Event'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Email All Passes (After Admin Releases Tokens) */}
             <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#07271c] via-slate-950 to-[#0a1526] border border-emerald-500/50 shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -1526,10 +1587,10 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                   BULK EMAIL DISTRIBUTION
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-white font-heading">
-                  Email All Food Passes to Participants
+                  Email Event Food Passes to Participants
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Once the admin releases the food tokens for confirmed event participants, coordinators can dispatch every pass directly to the participant's mailbox with a single action.
+                  Dispatch the passes you generated above directly to each participant's mailbox — select one event or all your events at once.
                 </p>
 
                 <div className="pt-1 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -1538,7 +1599,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                     onChange={(e) => setEmailAllEventId(e.target.value)}
                     className="px-4 py-3 rounded-2xl bg-slate-900 border border-emerald-900/60 text-white text-xs font-mono focus:outline-none focus:border-emerald-400 cursor-pointer"
                   >
-                    <option value="all">All Events (All Issued Passes)</option>
+                    <option value="all">My Events (All Issued Passes)</option>
                     {allEvents.map((ev) => (
                       <option key={ev.id} value={ev.id}>{ev.eventName}</option>
                     ))}
@@ -1705,6 +1766,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                   <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                     <tr>
                       <th className="p-4">Coupon Code</th>
+                      <th className="p-4">Event</th>
                       <th className="p-4">Participant</th>
                       <th className="p-4">Email</th>
                       <th className="p-4">Status</th>
@@ -1714,8 +1776,8 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                   <tbody className="divide-y divide-purple-950/50 font-mono">
                     {coordFoodCoupons.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-400 font-sans">
-                          No food passes generated by admin yet. Ask the admin to generate tokens for confirmed event participants.
+                        <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
+                          No food passes for your events yet. Generate them per event above.
                         </td>
                       </tr>
                     ) : (
@@ -1725,6 +1787,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                         return (
                           <tr key={cpnId} className="hover:bg-purple-950/20 transition-colors">
                             <td className="p-4 font-bold text-emerald-300">{c.couponCode}</td>
+                            <td className="p-4 font-sans font-medium text-cyan-300">{c.eventName || '—'}</td>
                             <td className="p-4 font-sans font-medium text-white">{c.userName}</td>
                             <td className="p-4 text-slate-300">{c.userEmail}</td>
                             <td className="p-4">

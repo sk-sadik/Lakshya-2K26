@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { FoodCoupon, IFoodCoupon } from '../models/FoodCoupon';
 import { User } from '../models/User';
 import { Registration } from '../models/Registration';
+import { Event } from '../models/Event';
 import { sendFoodCouponEmail } from '../services/emailService';
 import { AuthenticatedRequest } from '../middleware/auth';
 
@@ -36,7 +37,7 @@ async function generateUniqueCouponCode(): Promise<string> {
 // POST /api/coupons/generate
 export async function generateCoupon(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { mealType, mealDescription, email } = req.body;
+    const { mealType, mealDescription, email, eventId } = req.body;
 
     // 1. Authenticate / Identify user
     let user = req.user;
@@ -57,10 +58,29 @@ export async function generateCoupon(req: AuthenticatedRequest, res: Response): 
 
     const userEmail = user.email.toLowerCase().trim();
 
-    // 2. Check if user already has an active or used coupon
-    const existingCoupon = await FoodCoupon.findOne({
-      $or: [{ user: user._id }, { userEmail }],
-    }).sort({ createdAt: -1 });
+    // Optional event linkage: one pass per (event, participant)
+    let linkedEventKey: string | null = null;
+    let linkedEventName: string | undefined;
+    if (eventId) {
+      const event = await findEventByIdOrCustom(String(eventId));
+      if (!event) {
+        res.status(404).json({ success: false, message: 'Event not found.' });
+        return;
+      }
+      if (!ownsEventOrAdmin(event, req.user)) {
+        res.status(403).json({ success: false, message: 'You can only generate passes for your own events.' });
+        return;
+      }
+      linkedEventKey = event._id.toString();
+      linkedEventName = event.eventName;
+    }
+
+    // 2. Duplicate check: per-event when linked, otherwise global (legacy behaviour)
+    const existingCoupon = linkedEventKey
+      ? await FoodCoupon.findOne({ eventId: linkedEventKey, userEmail }).sort({ createdAt: -1 })
+      : await FoodCoupon.findOne({
+          $or: [{ user: user._id }, { userEmail }],
+        }).sort({ createdAt: -1 });
 
     if (existingCoupon) {
       if (existingCoupon.status === 'USED') {
@@ -119,6 +139,10 @@ export async function generateCoupon(req: AuthenticatedRequest, res: Response): 
       userEmail,
       college: (user as any).college || 'Lakireddy Bali Reddy College of Engineering (Autonomous)',
       department: (user as any).department || 'cse',
+      eventId: linkedEventKey || undefined,
+      eventName: linkedEventName,
+      issuedBy: req.user?.name,
+      issuedByEmail: ((req.user as any)?.email || '').toLowerCase().trim() || undefined,
       mealType: assignedMealType,
       mealDescription: assignedMealDesc,
       venue,
@@ -316,10 +340,77 @@ export async function verifyCoupon(req: Request, res: Response): Promise<void> {
   }
 }
 
-// GET /api/coupons (Admin: View all food coupons)
-export async function getAllCoupons(_req: Request, res: Response): Promise<void> {
+/**
+ * Resolve an event by Mongo ObjectId or customId. Returns null when not found.
+ */
+async function findEventByIdOrCustom(eventId: string): Promise<any> {
+  if (String(eventId).match(/^[0-9a-fA-F]{24}$/)) {
+    const byId = await Event.findById(eventId);
+    if (byId) return byId;
+  }
+  return Event.findOne({ customId: eventId });
+}
+
+/**
+ * Coordinator ownership check: owns the event, or is an admin (admins bypass).
+ */
+function ownsEventOrAdmin(event: any, user: any): boolean {
+  const roles: string[] = Array.isArray(user?.roles) ? user.roles : [user?.role].filter(Boolean);
+  if (roles.includes('admin')) return true;
+  const userEmail = (user?.email || '').toLowerCase().trim();
+  return (
+    String(event.coordinator || '') === String(user?._id) ||
+    (event.coordinatorEmail || '').toLowerCase().trim() === userEmail
+  );
+}
+
+/**
+ * All confirmed registrations for one event, matching both ObjectId and string id forms.
+ */
+async function findConfirmedRegsForEvent(event: any): Promise<any[]> {
+  const orConditions: any[] = [{ eventId: event._id.toString() }];
+  if (String(event._id).match(/^[0-9a-fA-F]{24}$/)) {
+    orConditions.push({ event: event._id });
+  }
+  if (event.customId) {
+    orConditions.push({ eventId: event.customId });
+  }
+  return Registration.find({
+    $or: orConditions,
+    registrationStatus: 'CONFIRMED',
+  });
+}
+
+// GET /api/coupons (Admin: all coupons; Coordinator: only coupons of their own events)
+export async function getAllCoupons(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const coupons = await FoodCoupon.find().sort({ createdAt: -1 });
+    const { eventId } = (req.query || {}) as any;
+    const filter: any = {};
+    if (eventId) {
+      const event = await findEventByIdOrCustom(String(eventId));
+      filter.eventId = event ? event._id.toString() : String(eventId);
+    }
+
+    // Coordinators (non-admin) only ever see coupons issued for their own events
+    const roles: string[] = Array.isArray((req.user as any)?.roles)
+      ? (req.user as any).roles
+      : [(req.user as any)?.role].filter(Boolean);
+    if (!roles.includes('admin')) {
+      const userEmail = ((req.user as any)?.email || '').toLowerCase().trim();
+      const ownEvents = await Event.find({
+        $or: [{ coordinator: (req.user as any)?._id }, { coordinatorEmail: userEmail }],
+      });
+      const ownIds = new Set(ownEvents.map((e: any) => e._id.toString()));
+      if (filter.eventId && !ownIds.has(filter.eventId)) {
+        res.status(403).json({ success: false, message: 'You can only view coupons of your own events.' });
+        return;
+      }
+      if (!filter.eventId) {
+        filter.eventId = { $in: Array.from(ownIds) };
+      }
+    }
+
+    const coupons = await FoodCoupon.find(filter).sort({ createdAt: -1 });
     res.status(200).json({
       success: true,
       coupons: coupons.map((c) => c.toJSON()),
@@ -333,20 +424,39 @@ export async function getAllCoupons(_req: Request, res: Response): Promise<void>
   }
 }
 
-// POST /api/coupons/bulk-generate-for-participants (Admin: Generate tokens ONLY for event registered participants)
+// POST /api/coupons/bulk-generate-for-participants
+// Generate ONE food pass per (event, participant). A student registered in 3 events
+// receives 3 passes — one issued per event. Coordinators may only generate for their own events.
 export async function generateTokensForEventParticipants(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { mealType, mealDescription, eventId } = req.body;
+    const { mealType, mealDescription, eventId } = req.body || {};
 
-    // 1. Fetch only confirmed registrations in events (not general users)
-    const query: any = { registrationStatus: 'CONFIRMED' };
+    // 1. Resolve target events (single event when eventId given, else every event with confirmed regs)
+    let targetEvents: any[] = [];
     if (eventId) {
-      query.eventId = eventId;
+      const event = await findEventByIdOrCustom(String(eventId));
+      if (!event) {
+        res.status(404).json({ success: false, message: 'Event not found.' });
+        return;
+      }
+      if (!ownsEventOrAdmin(event, req.user)) {
+        res.status(403).json({ success: false, message: 'You can only generate passes for your own events.' });
+        return;
+      }
+      targetEvents = [event];
+    } else {
+      const regs = await Registration.find({ registrationStatus: 'CONFIRMED' }).select('event eventId');
+      const keys = new Set<string>();
+      for (const r of regs) {
+        if ((r as any).event) keys.add(String((r as any).event));
+        else if ((r as any).eventId) keys.add(String((r as any).eventId));
+      }
+      const found = await Event.find({ _id: { $in: Array.from(keys).filter((k) => k.match(/^[0-9a-fA-F]{24}$/)) } });
+      const byId = new Map(found.map((e: any) => [e._id.toString(), e]));
+      targetEvents = Array.from(keys).map((k) => byId.get(k)).filter(Boolean);
     }
 
-    const confirmedRegistrations = await Registration.find(query);
-
-    if (confirmedRegistrations.length === 0) {
+    if (targetEvents.length === 0) {
       res.status(200).json({
         success: true,
         message: 'No confirmed event participants found to generate tokens for.',
@@ -361,109 +471,104 @@ export async function generateTokensForEventParticipants(req: AuthenticatedReque
       return;
     }
 
-    // 2. Group by unique participant email to ensure 1 food pass per distinct participant
-    const uniqueParticipantsMap = new Map<string, {
-      studentId: string;
-      studentName: string;
-      studentEmail: string;
-      studentPhone?: string;
-      college: string;
-      department: string;
-      eventName: string;
-    }>();
-
-    for (const reg of confirmedRegistrations) {
-      const email = reg.studentEmail.toLowerCase().trim();
-      if (!uniqueParticipantsMap.has(email)) {
-        uniqueParticipantsMap.set(email, {
-          studentId: reg.studentId || (reg.student ? reg.student.toString() : ''),
-          studentName: reg.studentName,
-          studentEmail: email,
-          studentPhone: reg.studentPhone,
-          college: reg.college || 'Lakireddy Bali Reddy College of Engineering (Autonomous)',
-          department: reg.department || 'cse',
-          eventName: reg.eventName,
-        });
-      }
-    }
-
-    const uniqueParticipants = Array.from(uniqueParticipantsMap.values());
-    const totalUniqueParticipants = uniqueParticipants.length;
-
-    let newTokensGenerated = 0;
-    let alreadyHadTokens = 0;
-    const generatedTokensList: any[] = [];
-
     const assignedMealType = mealType || 'Lakshya Grand Symposium Feast & Refreshment';
     const assignedMealDesc = mealDescription || 'Complimentary full-course meal voucher including special lunch combo, dessert, and evening beverage.';
     const venue = 'Central Food Court & Dining Arena, LBRCE Campus';
     const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const issuedBy = req.user?.name || 'Coordinator';
+    const issuedByEmail = ((req.user as any)?.email || '').toLowerCase().trim();
 
-    // 3. Process each unique event participant
-    for (const participant of uniqueParticipants) {
-      // Check if participant already has an active or used coupon
-      const existing = await FoodCoupon.findOne({
-        $or: [
-          { userEmail: participant.studentEmail },
-          { userId: participant.studentId },
-        ],
-      });
+    let totalEventRegistrations = 0;
+    let newTokensGenerated = 0;
+    let alreadyHadTokens = 0;
+    const generatedTokensList: any[] = [];
+    const perEvent: { eventName: string; generated: number; skipped: number }[] = [];
 
-      if (existing) {
-        alreadyHadTokens++;
-        continue;
+    // 2. One pass per (event, participant)
+    for (const event of targetEvents) {
+      const eventKey = event._id.toString();
+      const regs = await findConfirmedRegsForEvent(event);
+      totalEventRegistrations += regs.length;
+      let generated = 0;
+      let skipped = 0;
+
+      // Unique students within this event
+      const seen = new Set<string>();
+      for (const reg of regs) {
+        const email = (reg.studentEmail || '').toLowerCase().trim();
+        if (!email || seen.has(email)) continue;
+        seen.add(email);
+
+        const existing = await FoodCoupon.findOne({ eventId: eventKey, userEmail: email });
+        if (existing) {
+          skipped++;
+          continue;
+        }
+
+        const couponCode = await generateUniqueCouponCode();
+        let qrCodeDataUrl: string | undefined;
+        try {
+          qrCodeDataUrl = await QRCode.toDataURL(couponCode, {
+            errorCorrectionLevel: 'H',
+            margin: 2,
+            width: 300,
+            color: { dark: '#0f172a', light: '#ffffff' },
+          });
+        } catch (err) {
+          console.error('[Bulk Generator] QR generation error:', err);
+        }
+
+        try {
+          const newCoupon = await FoodCoupon.create({
+            couponCode,
+            user: reg.studentId && String(reg.studentId).match(/^[0-9a-fA-F]{24}$/)
+              ? reg.studentId
+              : undefined,
+            userId: reg.studentId || 'event-participant',
+            userName: reg.studentName,
+            userEmail: email,
+            college: reg.college || 'Lakireddy Bali Reddy College of Engineering (Autonomous)',
+            department: reg.department || 'cse',
+            eventId: eventKey,
+            eventName: event.eventName,
+            issuedBy,
+            issuedByEmail,
+            mealType: assignedMealType,
+            mealDescription: assignedMealDesc,
+            venue,
+            status: 'ACTIVE',
+            generatedDate: new Date(),
+            expiryDate,
+            qrCodeDataUrl,
+          });
+          generated++;
+          generatedTokensList.push(newCoupon.toJSON());
+        } catch (createErr: any) {
+          // Race-safe: unique (eventId, userEmail) index won the pass to another call
+          if (createErr?.code === 11000) {
+            skipped++;
+          } else {
+            throw createErr;
+          }
+        }
       }
 
-      // Generate unique token code
-      const couponCode = await generateUniqueCouponCode();
-
-      // Generate QR Code data URL
-      let qrCodeDataUrl: string | undefined;
-      try {
-        qrCodeDataUrl = await QRCode.toDataURL(couponCode, {
-          errorCorrectionLevel: 'H',
-          margin: 2,
-          width: 300,
-          color: { dark: '#0f172a', light: '#ffffff' },
-        });
-      } catch (err) {
-        console.error('[Bulk Generator] QR generation error:', err);
-      }
-
-      // Create FoodCoupon record in MongoDB
-      const newCoupon = await FoodCoupon.create({
-        couponCode,
-        user: participant.studentId && participant.studentId.match(/^[0-9a-fA-F]{24}$/)
-          ? participant.studentId
-          : undefined,
-        userId: participant.studentId || 'event-participant',
-        userName: participant.studentName,
-        userEmail: participant.studentEmail,
-        college: participant.college,
-        department: participant.department,
-        mealType: assignedMealType,
-        mealDescription: assignedMealDesc,
-        venue,
-        status: 'ACTIVE',
-        generatedDate: new Date(),
-        expiryDate,
-        qrCodeDataUrl,
-      });
-
-      newTokensGenerated++;
-      generatedTokensList.push(newCoupon.toJSON());
+      newTokensGenerated += generated;
+      alreadyHadTokens += skipped;
+      perEvent.push({ eventName: event.eventName, generated, skipped });
     }
 
     res.status(201).json({
       success: true,
-      message: `Generated ${newTokensGenerated} tokens for verified event participants! (${alreadyHadTokens} already had valid tokens). Tokens are now available for coordinators to dispatch via email.`,
+      message: `Generated ${newTokensGenerated} food pass(es) across ${targetEvents.length} event(s)! (${alreadyHadTokens} already had passes for their event.) Each pass is emailed by its event coordinator.`,
       stats: {
-        totalEventRegistrations: confirmedRegistrations.length,
-        uniqueParticipants: totalUniqueParticipants,
+        totalEventRegistrations,
+        uniqueParticipants: totalEventRegistrations,
         newTokensGenerated,
         alreadyHadTokens,
         emailsDispatched: 0,
       },
+      perEvent,
       tokens: generatedTokensList,
     });
   } catch (error: any) {
@@ -475,36 +580,54 @@ export async function generateTokensForEventParticipants(req: AuthenticatedReque
   }
 }
 
-// POST /api/coupons/send-emails-to-participants (Coordinator/Admin: bulk dispatch all issued passes to confirmed event participants via email)
+// POST /api/coupons/send-emails-to-participants
+// Email the issued passes of ONE event to its participants (coordinator: own events only).
+// Without eventId (admin global), emails every issued pass.
 export async function sendCouponEmailsToParticipants(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const { eventId } = req.body || {};
 
-    // 1. Determine target participant emails from CONFIRMED event registrations (optionally per event)
-    const query: any = { registrationStatus: 'CONFIRMED' };
+    let eventKey: string | null = null;
     if (eventId) {
-      query.$or = [{ event: eventId }, { eventId }];
+      const event = await findEventByIdOrCustom(String(eventId));
+      if (!event) {
+        res.status(404).json({ success: false, message: 'Event not found.' });
+        return;
+      }
+      if (!ownsEventOrAdmin(event, req.user)) {
+        res.status(403).json({ success: false, message: 'You can only email passes for your own events.' });
+        return;
+      }
+      eventKey = event._id.toString();
     }
 
-    const confirmedRegistrations = await Registration.find(query);
-    const uniqueEmailSet = new Set<string>();
-    confirmedRegistrations.forEach((r) => {
-      const email = (r.studentEmail || '').toLowerCase().trim();
-      if (email) uniqueEmailSet.add(email);
-    });
-    const targetEmails = Array.from(uniqueEmailSet);
+    // Only the passes issued for this event (legacy passes without eventId are
+    // included only in the admin global send, never in a coordinator's event send)
+    const couponFilter: any = eventKey ? { eventId: eventKey } : {};
+    if (!eventKey) {
+      const roles: string[] = Array.isArray((req.user as any)?.roles)
+        ? (req.user as any).roles
+        : [(req.user as any)?.role].filter(Boolean);
+      if (!roles.includes('admin')) {
+        const userEmail = ((req.user as any)?.email || '').toLowerCase().trim();
+        const ownEvents = await Event.find({
+          $or: [{ coordinator: (req.user as any)?._id }, { coordinatorEmail: userEmail }],
+        });
+        couponFilter.eventId = { $in: ownEvents.map((e: any) => e._id.toString()) };
+      }
+    }
+    const coupons = await FoodCoupon.find(couponFilter);
 
-    if (targetEmails.length === 0) {
+    if (coupons.length === 0) {
       res.status(200).json({
         success: true,
-        message: 'No confirmed event participants found with issued food passes to dispatch.',
+        message: eventKey
+          ? 'No food passes have been generated for this event yet. Generate them first.'
+          : 'No food passes issued yet.',
         stats: { targetParticipants: 0, couponsFound: 0, sent: 0, failed: 0, failedEmails: [] },
       });
       return;
     }
-
-    // 2. Find the food passes issued to those participants
-    const coupons = await FoodCoupon.find({ userEmail: { $in: targetEmails } });
 
     // 3. Dispatch each pass to the participant's mailbox
     let sent = 0;
@@ -537,7 +660,7 @@ export async function sendCouponEmailsToParticipants(req: AuthenticatedRequest, 
         ? `Food passes dispatched: ${sent} emailed successfully, ${failed} failed. Check failedEmails for details.`
         : `All ${sent} food passes were emailed successfully to participants.`,
       stats: {
-        targetParticipants: targetEmails.length,
+        targetParticipants: coupons.length,
         couponsFound: coupons.length,
         sent,
         failed,

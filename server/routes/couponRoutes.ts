@@ -20,8 +20,8 @@ const router = Router();
 // GET /api/coupons (Coordinator/Admin: view all coupons)
 router.get('/', protect, authorize('coordinator', 'admin'), getAllCoupons);
 
-// POST /api/coupons/bulk-generate-for-participants (Admin: generate food tokens strictly for event registered participants)
-router.post('/bulk-generate-for-participants', protect, authorize('admin'), generateTokensForEventParticipants);
+// POST /api/coupons/bulk-generate-for-participants (Admin: all events; Coordinator: own events only)
+router.post('/bulk-generate-for-participants', protect, authorize('coordinator', 'admin'), generateTokensForEventParticipants);
 
 // POST /api/coupons/generate (Coordinator/Admin: generate a coupon for a participant)
 router.post('/generate', protect, authorize('coordinator', 'admin'), generateCoupon);
@@ -35,8 +35,8 @@ router.post('/send-to-email', protect, authorize('admin'), sendCouponToEmailAdmi
 // POST /api/coupons/:id/send-email (Coordinator/Admin: email an existing coupon to the participant)
 router.post('/:id/send-email', protect, authorize('coordinator', 'admin'), sendCouponEmailById);
 
-// GET /api/coupons/my (Coordinator/Admin only)
-router.get('/my', protect, authorize('coordinator', 'admin'), getMyCoupons);
+// GET /api/coupons/my (any logged-in user: their own passes, one per event registered)
+router.get('/my', protect, getMyCoupons);
 
 // POST /api/coupons/verify (check validity before redemption)
 router.post('/verify', protect, authorize('coordinator', 'admin'), verifyCoupon);

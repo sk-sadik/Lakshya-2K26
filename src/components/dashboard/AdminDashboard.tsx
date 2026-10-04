@@ -2158,10 +2158,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   EVENT PARTICIPANTS ONLY
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-white font-heading">
-                  Generate Food Tokens for Coordinators
+                  Generate Food Tokens (One Pass per Event Registration)
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Click below to generate food tokens for all confirmed symposium event registrations. Tokens are issued to coordinators, who then email them directly to participants. Students without event registrations are automatically excluded.
+                  Generates one dining pass per confirmed event registration across all events — a student in 3 events receives 3 passes. Already-issued passes are skipped. Coordinators then email their own event's passes to participants. Students without event registrations are automatically excluded.
                 </p>
 
                 <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -2376,6 +2376,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                     <tr>
                       <th className="p-4">Token Code</th>
+                      <th className="p-4">Event</th>
                       <th className="p-4">Participant Name</th>
                       <th className="p-4">Registered Email</th>
                       <th className="p-4">Institution</th>
@@ -2392,7 +2393,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           c.couponCode.toLowerCase().includes(q) ||
                           c.userName.toLowerCase().includes(q) ||
                           c.userEmail.toLowerCase().includes(q) ||
-                          c.college.toLowerCase().includes(q);
+                          c.college.toLowerCase().includes(q) ||
+                          (c.eventName || '').toLowerCase().includes(q);
                         const matchStatus = tokenStatusFilter === 'all' || c.status === tokenStatusFilter;
                         return matchSearch && matchStatus;
                       })
@@ -2400,6 +2402,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <tr key={coupon.id || coupon.couponCode} className="hover:bg-purple-950/20 transition-colors">
                           <td className="p-4 font-bold text-emerald-300">
                             {coupon.couponCode}
+                          </td>
+                          <td className="p-4 text-cyan-300 font-sans font-medium">
+                            {coupon.eventName || '—'}
                           </td>
                           <td className="p-4 text-white font-sans font-medium">
                             {coupon.userName}
@@ -2441,7 +2446,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                     {adminFoodCoupons.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="p-8 text-center text-slate-400 font-sans">
+                        <td colSpan={8} className="p-8 text-center text-slate-400 font-sans">
                           No participant food tokens generated yet. Click "Generate Tokens for All Event Participants" above to issue tokens.
                         </td>
                       </tr>

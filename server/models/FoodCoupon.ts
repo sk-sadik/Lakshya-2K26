@@ -10,6 +10,12 @@ export interface IFoodCoupon extends Document {
   userEmail: string;
   college: string;
   department: string;
+  // Event linkage: one coupon per (event, participant). A student in 3 events holds 3 coupons.
+  eventId?: string;
+  eventName?: string;
+  // Who issued the pass (admin or the event's coordinator)
+  issuedBy?: string;
+  issuedByEmail?: string;
   mealType: string;
   mealDescription: string;
   venue: string;
@@ -67,6 +73,24 @@ const FoodCouponSchema = new Schema<IFoodCoupon>(
       default: 'cse',
       trim: true,
     },
+    eventId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    eventName: {
+      type: String,
+      trim: true,
+    },
+    issuedBy: {
+      type: String,
+      trim: true,
+    },
+    issuedByEmail: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
     mealType: {
       type: String,
       default: 'Lakshya Grand Symposium Feast & Refreshment',
@@ -114,6 +138,13 @@ const FoodCouponSchema = new Schema<IFoodCoupon>(
   {
     timestamps: true,
   }
+);
+
+// One coupon per (event, participant): a student registered in 3 events holds 3 coupons.
+// Partial index so legacy coupons without an eventId never collide with each other.
+FoodCouponSchema.index(
+  { eventId: 1, userEmail: 1 },
+  { unique: true, partialFilterExpression: { eventId: { $exists: true } } }
 );
 
 // Virtual for client-safe id

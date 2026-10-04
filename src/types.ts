@@ -225,6 +225,9 @@ export interface FoodCoupon {
   userEmail: string;
   college: string;
   department: string;
+  eventId?: string;
+  eventName?: string;
+  issuedBy?: string;
   mealType: string;
   mealDescription: string;
   venue: string;
