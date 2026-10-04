@@ -438,7 +438,7 @@ export const ThreeHeroCore: React.FC<ThreeHeroCoreProps> = ({ onExploreEvents, o
         <div className="relative mb-3">
           <h1
             id="hero-lakshya-title"
-            className="text-6xl sm:text-8xl md:text-9xl lg:text-[10rem] font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-pink-100 to-purple-300 drop-shadow-[0_15px_45px_rgba(168,85,247,0.65)] select-none leading-none"
+            className="text-5xl min-[420px]:text-6xl sm:text-8xl md:text-9xl lg:text-[10rem] font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-pink-100 to-purple-300 drop-shadow-[0_15px_45px_rgba(168,85,247,0.65)] select-none leading-none"
           >
             LAKSHYA
           </h1>
@@ -506,7 +506,7 @@ export const ThreeHeroCore: React.FC<ThreeHeroCoreProps> = ({ onExploreEvents, o
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950/80 border border-purple-500/30 backdrop-blur-md shadow-md">
             <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
             <span className="text-xs sm:text-sm font-mono text-slate-400">Branches:</span>
-            <span className="font-tech text-sm sm:text-base font-bold text-white">9 Departments</span>
+            <span className="font-tech text-sm sm:text-base font-bold text-white">10 Departments</span>
           </div>
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950/80 border border-emerald-500/30 backdrop-blur-md shadow-md">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />

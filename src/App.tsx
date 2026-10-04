@@ -261,48 +261,48 @@ export default function App() {
       {/* Floating Fast-Metrics Ticker */}
       <section className="relative z-20 -mt-6 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 sm:p-6 rounded-2xl bg-slate-900/90 border border-purple-900/60 backdrop-blur-xl shadow-2xl">
-          <div className="flex items-center gap-3 p-2">
-            <div className="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center shrink-0 border border-pink-500/30">
+          <div className="flex items-center gap-2 min-[400px]:gap-3 p-1 min-[400px]:p-2 min-w-0">
+            <div className="w-8 h-8 min-[400px]:w-10 min-[400px]:h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center shrink-0 border border-pink-500/30">
               <Trophy className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-lg sm:text-2xl font-black font-tech text-white block leading-tight">
+              <span className="text-base min-[400px]:text-lg sm:text-2xl font-black font-tech text-white block leading-tight">
                 {FEST_METRICS.prizePool}
               </span>
               <span className="text-[11px] font-mono text-purple-300/80 uppercase">Cash & Awards</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-2">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 border border-cyan-500/30">
+          <div className="flex items-center gap-2 min-[400px]:gap-3 p-1 min-[400px]:p-2 min-w-0">
+            <div className="w-8 h-8 min-[400px]:w-10 min-[400px]:h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 border border-cyan-500/30">
               <Cpu className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-lg sm:text-2xl font-black font-tech text-white block leading-tight">
+              <span className="text-base min-[400px]:text-lg sm:text-2xl font-black font-tech text-white block leading-tight">
                 {FEST_METRICS.eventsCount}
               </span>
               <span className="text-[11px] font-mono text-purple-300/80 uppercase">Technical Events</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-2">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/30">
+          <div className="flex items-center gap-2 min-[400px]:gap-3 p-1 min-[400px]:p-2 min-w-0">
+            <div className="w-8 h-8 min-[400px]:w-10 min-[400px]:h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/30">
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-lg sm:text-2xl font-black font-tech text-white block leading-tight">
+              <span className="text-base min-[400px]:text-lg sm:text-2xl font-black font-tech text-white block leading-tight">
                 {FEST_METRICS.expectedFootfall}
               </span>
               <span className="text-[11px] font-mono text-purple-300/80 uppercase">Annual Footfall</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-2">
-            <div className="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-300 flex items-center justify-center shrink-0 border border-pink-500/30">
+          <div className="flex items-center gap-2 min-[400px]:gap-3 p-1 min-[400px]:p-2 min-w-0">
+            <div className="w-8 h-8 min-[400px]:w-10 min-[400px]:h-10 rounded-xl bg-pink-500/20 text-pink-300 flex items-center justify-center shrink-0 border border-pink-500/30">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-lg sm:text-2xl font-black font-tech text-white block leading-tight">
+              <span className="text-base min-[400px]:text-lg sm:text-2xl font-black font-tech text-white block leading-tight">
                 1 Mega Day
               </span>
               <span className="text-[11px] font-mono text-pink-400/80 uppercase font-semibold">NATIONAL SYMPOSIUM</span>

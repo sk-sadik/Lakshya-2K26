@@ -69,14 +69,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           : 'bg-transparent py-5'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-3 min-[400px]:px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-2">
         {/* Brand / Logo */}
         <a
           href="#"
           onClick={() => SoundEngine.playClick()}
-          className="flex items-center gap-3 group cursor-pointer"
+          className="flex items-center gap-2 min-[400px]:gap-3 group cursor-pointer min-w-0"
         >
-          <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-cyan-400 flex items-center justify-center p-0.5 shadow-lg shadow-purple-600/30 group-hover:scale-105 transition-transform">
+          <div className="relative w-8 h-8 min-[400px]:w-10 min-[400px]:h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-600 to-cyan-400 flex items-center justify-center p-0.5 shadow-lg shadow-purple-600/30 group-hover:scale-105 transition-transform shrink-0">
             <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
               <Layers className="w-5 h-5 text-cyan-400 group-hover:rotate-12 transition-transform" />
             </div>
@@ -87,7 +87,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-lg sm:text-xl font-extrabold font-heading tracking-wider text-white">
+              <span className="text-base min-[400px]:text-lg sm:text-xl font-extrabold font-heading tracking-wider text-white">
                 LAKSHYA
               </span>
               <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/40">
@@ -115,12 +115,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-3">
-          {/* Sound Toggle */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* Sound Toggle (hidden on very small screens to save navbar space) */}
           <button
             id="nav-sound-toggle"
             onClick={toggleSound}
-            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-purple-900/50 transition-colors cursor-pointer"
+            className="hidden min-[420px]:flex p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-purple-900/50 transition-colors cursor-pointer items-center justify-center"
             title={isMuted ? 'Unmute Audio FX' : 'Mute Audio FX'}
           >
             {isMuted ? <VolumeX className="w-4 h-4 text-pink-400" /> : <Volume2 className="w-4 h-4 text-cyan-400" />}
@@ -146,10 +146,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               SoundEngine.playWarp();
               onOpenRegister();
             }}
-            className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white text-xs font-tech font-bold uppercase tracking-wider shadow-lg shadow-pink-600/25 flex items-center gap-1.5 cursor-pointer transition-all hover:scale-105"
+            className="px-2.5 min-[400px]:px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white text-xs font-tech font-bold uppercase tracking-wider shadow-lg shadow-pink-600/25 flex items-center gap-1.5 cursor-pointer transition-all hover:scale-105"
           >
-            <Ticket className="w-3.5 h-3.5" />
-            <span>Register</span>
+            <Ticket className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden min-[400px]:inline">Register</span>
           </button>
 
           {/* Login or Dashboard + Logout CTAs */}
@@ -163,9 +163,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 className="px-3 sm:px-3.5 py-2 rounded-xl bg-purple-950/80 hover:bg-purple-900/80 text-purple-200 hover:text-white border border-purple-700/60 text-xs font-tech font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all shadow-md shadow-purple-950"
               >
-                <LayoutDashboard className="w-3.5 h-3.5 text-cyan-400" />
+                <LayoutDashboard className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                 <span className="hidden sm:inline">{currentUser.role.toUpperCase()} PORTAL</span>
-                <span className="sm:hidden">Portal</span>
+                <span className="hidden min-[400px]:inline sm:hidden">Portal</span>
               </button>
               {onLogout && (
                 <button
@@ -191,8 +191,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-purple-200 hover:text-white border border-purple-700/60 hover:border-cyan-400/80 text-xs font-tech font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all hover:scale-105 shadow-md shadow-purple-950"
             >
-              <LogIn className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Login</span>
+              <LogIn className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="hidden min-[400px]:inline">Login</span>
             </button>
           )}
 

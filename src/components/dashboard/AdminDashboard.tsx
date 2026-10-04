@@ -1298,7 +1298,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Users Table */}
             <div className="rounded-3xl bg-slate-950/80 border border-purple-900/40 overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-sans">
+                <table className="w-full min-w-[620px] text-left text-xs font-sans">
                   <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                     <tr>
                       <th className="p-4">User Details</th>
@@ -1495,7 +1495,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Students Table */}
             <div className="rounded-3xl bg-slate-950/80 border border-purple-900/40 overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-sans">
+                <table className="w-full min-w-[620px] text-left text-xs font-sans">
                   <thead className="bg-purple-950/40 text-pink-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                     <tr>
                       <th className="p-4">Student Name & Roll No</th>
@@ -1643,7 +1643,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Coordinators Detailed Table */}
             <div className="rounded-3xl bg-slate-950/80 border border-purple-900/40 overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-sans">
+                <table className="w-full min-w-[620px] text-left text-xs font-sans">
                   <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                     <tr>
                       <th className="p-4">Co-ordinator Details</th>
@@ -2007,7 +2007,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Registry Table */}
             <div className="rounded-3xl bg-slate-950/80 border border-purple-900/40 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-sans">
+                <table className="w-full min-w-[620px] text-left text-xs font-sans">
                   <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                     <tr>
                       <th className="p-4">Reg Token</th>
@@ -2372,7 +2372,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Issued Tokens Table */}
             <div className="rounded-3xl bg-slate-950/80 border border-purple-900/40 overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-sans">
+                <table className="w-full min-w-[620px] text-left text-xs font-sans">
                   <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                     <tr>
                       <th className="p-4">Token Code</th>
@@ -2495,8 +2495,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            <div className="rounded-3xl bg-slate-950/80 border border-purple-900/40 overflow-hidden">
-              <table className="w-full text-left text-xs font-sans">
+            <div className="rounded-3xl bg-slate-950/80 border border-purple-900/40 overflow-x-auto">
+              <table className="w-full min-w-[620px] text-left text-xs font-sans">
                 <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                   <tr>
                     <th className="p-4">Rank</th>
@@ -2895,7 +2895,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-mono uppercase mb-1">Department *</label>
                     <select
@@ -2930,7 +2930,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 {/* Coordinator specific fields if coordinator role is active */}
                 {userFormRoles.includes('coordinator') && (
-                  <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-purple-950/30 border border-purple-800/40 animate-in fade-in">
+                  <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-3 p-3 rounded-2xl bg-purple-950/30 border border-purple-800/40 animate-in fade-in">
                     <div>
                       <label className="block text-purple-300 font-mono uppercase mb-1">Faculty ID</label>
                       <input
@@ -2964,7 +2964,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-mono uppercase mb-1">Phone Number</label>
                     <input
@@ -3043,7 +3043,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-mono uppercase mb-1">Department</label>
                     <select
@@ -3070,7 +3070,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-mono uppercase mb-1">Status</label>
                     <select
@@ -3098,7 +3098,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-mono uppercase mb-1">Venue</label>
                     <input
@@ -3119,7 +3119,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-mono uppercase mb-1">Date</label>
                     <input

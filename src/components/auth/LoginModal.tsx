@@ -766,7 +766,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-mono uppercase text-slate-400 mb-1">
                       Real Email *
@@ -809,7 +809,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-mono uppercase text-slate-400 mb-1">
                       Department

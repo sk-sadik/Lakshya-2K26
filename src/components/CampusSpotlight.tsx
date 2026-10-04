@@ -165,10 +165,10 @@ export const CampusSpotlight: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-950" />
               
               {/* Top Controls: Image floating pill & Change Picture button */}
-              <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2 z-20">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/85 backdrop-blur-md border border-purple-800/50 shadow-lg">
-                  <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-                  <span className="text-xs font-mono font-bold text-white tracking-wide">
+              <div className="absolute top-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2 z-20">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/85 backdrop-blur-md border border-purple-800/50 shadow-lg min-w-0">
+                  <Sparkles className="w-3.5 h-3.5 text-pink-400 shrink-0" />
+                  <span className="text-xs font-mono font-bold text-white tracking-wide truncate">
                     Central Administration Block
                   </span>
                 </div>
@@ -211,7 +211,7 @@ export const CampusSpotlight: React.FC = () => {
                 </div>
               )}
 
-              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-[11px] font-mono text-slate-300 z-10">
+              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-300 z-10">
                 <span className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-purple-900/50">
                   White Neoclassical Architecture
                 </span>

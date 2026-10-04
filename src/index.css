@@ -22,7 +22,6 @@
 .preserve-3d {
   transform-style: preserve-3d;
 }
-
 .perspective-1000 {
   perspective: 1000px;
 }
@@ -64,5 +63,61 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #a855f7 0%, #f43f5e 50%, #38bdf8 100%);
+}
+
+/* ============ Mobile responsiveness safety net ============ */
+
+/* Never allow horizontal page scroll (clip keeps position:sticky working) */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+/* Hide scrollbars on horizontal pill rails (utility used across components) */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Media never overflows its container and keeps aspect ratio */
+img,
+video,
+canvas {
+  max-width: 100%;
+}
+
+/* Long tokens / URLs / emails wrap instead of overflowing */
+.wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Prevent iOS Safari auto-zoom on focus (needs >= 16px inputs) */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Comfortable tap targets on touch devices without changing desktop design */
+@media (pointer: coarse) {
+  button,
+  a,
+  select,
+  input[type='checkbox'],
+  input[type='radio'] {
+    min-height: 40px;
+  }
+  /* Keep compact icon buttons and pill rails usable but not oversized */
+  nav a,
+  .scrollbar-none button {
+    min-height: 32px;
+  }
 }
 

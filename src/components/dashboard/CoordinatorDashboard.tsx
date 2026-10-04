@@ -1338,7 +1338,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
             {/* Participants Table */}
             <div className="rounded-3xl bg-slate-950/80 border border-purple-900/40 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-sans">
+                <table className="w-full min-w-[620px] text-left text-xs font-sans">
                   <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                     <tr>
                       <th className="p-4">Reg ID</th>
@@ -1701,7 +1701,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                 </button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-sans">
+                <table className="w-full min-w-[620px] text-left text-xs font-sans">
                   <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
                     <tr>
                       <th className="p-4">Coupon Code</th>
