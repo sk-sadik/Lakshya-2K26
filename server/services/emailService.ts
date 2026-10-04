@@ -25,7 +25,9 @@ export function createTransporter() {
   const pass = process.env.EMAIL_PASSWORD;
 
   if (user && pass && pass !== 'your_email_app_password' && pass !== 'lakshya_app_password_placeholder') {
-    // Standard Gmail or custom SMTP transporter
+    // Standard Gmail or custom SMTP transporter.
+    // Timeouts keep slow/unreachable SMTP relays (common from cloud hosts)
+    // from hanging API responses.
     if (host.includes('gmail') || user.includes('@gmail.com')) {
       return nodemailer.createTransport({
         service: 'gmail',
@@ -33,6 +35,9 @@ export function createTransporter() {
           user,
           pass,
         },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
       });
     }
 
@@ -44,10 +49,27 @@ export function createTransporter() {
         user,
         pass,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
   }
 
   return null;
+}
+
+// Fire-and-forget OTP dispatch: logs success/failure but never blocks the API response.
+export function sendOTPEmailInBackground(options: SendOTPOptions): void {
+  sendOTPEmail(options).then(
+    (result) => {
+      if (!result.success) {
+        console.error(`[EmailService] Background OTP send failed for ${options.to}:`, result.error);
+      }
+    },
+    (err) => {
+      console.error(`[EmailService] Background OTP send crashed for ${options.to}:`, err?.message || err);
+    }
+  );
 }
 
 export async function sendOTPEmail(options: SendOTPOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {

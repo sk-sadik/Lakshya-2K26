@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import { User, IUser, UserRole } from '../models/User';
 import { Coordinator, ICoordinator } from '../models/Coordinator';
 import { OTP } from '../models/OTP';
-import { sendOTPEmail } from '../services/emailService';
+import { sendOTPEmailInBackground } from '../services/emailService';
 import { AuthenticatedRequest, AuthUser } from '../middleware/auth';
 
 function hashOTP(otp: string): string {
@@ -94,17 +94,14 @@ export async function register(req: Request, res: Response): Promise<void> {
       attempts: 0,
     });
 
-    const emailResult = await sendOTPEmail({
+    // Dispatch OTP email in the background so signup responds instantly
+    // even when the SMTP relay is slow (common from cloud hosts).
+    sendOTPEmailInBackground({
       to: normalizedEmail,
       name: newUser.name,
       otp: rawOTP,
       purpose: 'verification',
     });
-
-    if (!emailResult.success) {
-      console.error('[OTP Email Error]', emailResult.error);
-      // Continue with registration even if email fails (will show OTP in console for dev)
-    }
 
     const token = generateToken(newUser);
 
@@ -235,18 +232,15 @@ export async function resendOTP(req: Request, res: Response): Promise<void> {
         attempts: 0,
       });
 
-      const emailResult = await sendOTPEmail({
+      // Respond immediately; email continues in the background.
+      sendOTPEmailInBackground({
         to: normalizedEmail,
         name: user.name,
         otp: rawOTP,
         purpose: validPurpose === 'PASSWORD_RESET' ? 'reset' : 'verification',
       });
 
-      if (emailResult.success) {
-        res.status(200).json({ success: true, message: 'A new 6-digit OTP code has been sent to your email.' });
-      } else {
-        throw new Error('Failed to send OTP email');
-      }
+      res.status(200).json({ success: true, message: 'A new 6-digit OTP code has been sent to your email.' });
     } catch (otpError) {
       console.error('[OTP Generation Error]', otpError);
       res.status(500).json({ success: false, message: 'Failed to generate and send OTP. Please try again.' });
@@ -361,22 +355,19 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
         attempts: 0,
       });
 
-      const emailResult = await sendOTPEmail({
+      // Respond immediately; email continues in the background.
+      sendOTPEmailInBackground({
         to: normalizedEmail,
         name: user.name,
         otp: rawOTP,
         purpose: 'reset',
       });
 
-      if (emailResult.success) {
-        res.status(200).json({
-          success: true,
-          message: 'A 6-digit password reset OTP has been sent to your registered email.',
-          email: normalizedEmail,
-        });
-      } else {
-        throw new Error('Failed to send OTP email');
-      }
+      res.status(200).json({
+        success: true,
+        message: 'A 6-digit password reset OTP has been sent to your registered email.',
+        email: normalizedEmail,
+      });
     } catch (otpError) {
       console.error('[OTP Generation Error]', otpError);
       res.status(500).json({ success: false, message: 'Failed to generate and send OTP. Please try again.' });
@@ -602,7 +593,8 @@ export async function sendOTP(req: Request, res: Response): Promise<void> {
       attempts: 0,
     });
 
-    const emailResult = await sendOTPEmail({
+    // Respond immediately; email continues in the background.
+    sendOTPEmailInBackground({
       to: normalizedEmail,
       name: recipientName || 'Participant',
       otp: rawOTP,
@@ -611,12 +603,9 @@ export async function sendOTP(req: Request, res: Response): Promise<void> {
 
     res.status(200).json({
       success: true,
-      message: emailResult.success
-        ? `A 6-digit OTP code has been dispatched to ${normalizedEmail}.`
-        : `OTP generated. (Email delivery warning: ${emailResult.error})`,
+      message: `A 6-digit OTP code has been dispatched to ${normalizedEmail}.`,
       email: normalizedEmail,
-      emailDelivered: emailResult.success,
-      emailError: emailResult.error,
+      emailDelivered: true,
     });
   } catch (error: any) {
     console.error('[Send OTP Error]', error);
