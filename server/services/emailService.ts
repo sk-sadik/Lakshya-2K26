@@ -213,6 +213,17 @@ export async function sendOTPEmail(options: SendOTPOptions): Promise<{ success: 
     return { success: false, error: errorMsg };
   }
 
+  // Fast path: Brevo HTTPS API first when configured (instant on hosts
+  // where SMTP ports are blocked); SMTP stays as the fallback.
+  if (process.env.BREVO_API_KEY) {
+    const apiResult = await sendViaBrevoHttpApi({ to, subject, html, from });
+    if (apiResult.success) {
+      console.log(`[EmailService] OTP sent via Brevo API to ${to}. MessageId: ${apiResult.messageId}`);
+      return apiResult;
+    }
+    console.error(`[EmailService] Brevo API send failed for ${to}, trying SMTP:`, apiResult.error);
+  }
+
   try {
     const info = await transporter.sendMail({
       from,
@@ -346,6 +357,17 @@ export async function sendFoodCouponEmail(options: SendFoodCouponOptions): Promi
     const errorMsg = 'SMTP credentials not properly configured in .env (EMAIL_USER or EMAIL_PASSWORD missing).';
     console.error(`[EmailService] ${errorMsg}`);
     return { success: false, error: errorMsg };
+  }
+
+  // Fast path: Brevo HTTPS API first when configured (instant on hosts
+  // where SMTP ports are blocked); SMTP stays as the fallback.
+  if (process.env.BREVO_API_KEY) {
+    const apiResult = await sendViaBrevoHttpApi({ to, subject, html, from });
+    if (apiResult.success) {
+      console.log(`[EmailService] Food coupon email sent via Brevo API to ${to}. MessageId: ${apiResult.messageId}`);
+      return apiResult;
+    }
+    console.error(`[EmailService] Brevo API send failed for ${to}, trying SMTP:`, apiResult.error);
   }
 
   try {
