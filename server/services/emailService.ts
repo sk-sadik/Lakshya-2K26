@@ -72,6 +72,64 @@ export function sendOTPEmailInBackground(options: SendOTPOptions): void {
   );
 }
 
+// Brevo HTTPS API delivery (port 443 — works from hosts that block SMTP ports,
+// e.g. Render free tier). Enabled by setting BREVO_API_KEY. Takes precedence
+// over SMTP whenever the key is present.
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
+
+function parseSender(from: string, fallbackEmail: string): { name: string; email: string } {
+  const match = from.match(/^(.*)<([^>]+)>\s*$/);
+  if (match) {
+    return { name: match[1].trim().replace(/^"|"$/g, '') || 'LBRCE Lakshya 2026', email: match[2].trim() || fallbackEmail };
+  }
+  return { name: 'LBRCE Lakshya 2026', email: from.includes('@') ? from.trim() : fallbackEmail };
+}
+
+async function sendViaBrevoHttpApi(options: {
+  to: string;
+  subject: string;
+  html: string;
+  from?: string;
+}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    return { success: false, error: 'BREVO_API_KEY not configured.' };
+  }
+  const sender = parseSender(
+    options.from || process.env.EMAIL_FROM || '',
+    process.env.EMAIL_USER || 'fest@lbrce.ac.in'
+  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const res = await fetch(BREVO_API_URL, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'api-key': apiKey,
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: options.to }],
+        subject: options.subject,
+        htmlContent: options.html,
+      }),
+      signal: controller.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: (data as any)?.message || `Brevo API error ${res.status}.` };
+    }
+    return { success: true, messageId: (data as any)?.messageId };
+  } catch (err: any) {
+    const msg = err?.name === 'AbortError' ? 'Brevo API request timed out.' : err?.message || 'Brevo API failure.';
+    return { success: false, error: msg };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function sendOTPEmail(options: SendOTPOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const { to, name, otp, purpose } = options;
   const from = process.env.EMAIL_FROM || `"LBRCE Lakshya 2026" <${process.env.EMAIL_USER || 'fest@lbrce.ac.in'}>`;
@@ -166,6 +224,11 @@ export async function sendOTPEmail(options: SendOTPOptions): Promise<{ success: 
     return { success: true, messageId: info.messageId };
   } catch (err: any) {
     console.error(`[EmailService] Failed to send email via SMTP to ${to}:`, err);
+    // Fall back to Brevo HTTPS API when SMTP fails (e.g. blocked SMTP ports on cloud hosts)
+    if (process.env.BREVO_API_KEY) {
+      console.log(`[EmailService] Retrying OTP send via Brevo API for ${to}...`);
+      return sendViaBrevoHttpApi({ to, subject, html, from });
+    }
     return { success: false, error: err.message || 'SMTP transmission failure.' };
   }
 }
@@ -296,6 +359,11 @@ export async function sendFoodCouponEmail(options: SendFoodCouponOptions): Promi
     return { success: true, messageId: info.messageId };
   } catch (err: any) {
     console.error(`[EmailService] Failed to send food coupon email to ${to}:`, err);
+    // Fall back to Brevo HTTPS API when SMTP fails (e.g. blocked SMTP ports on cloud hosts)
+    if (process.env.BREVO_API_KEY) {
+      console.log(`[EmailService] Retrying food coupon send via Brevo API for ${to}...`);
+      return sendViaBrevoHttpApi({ to, subject, html, from });
+    }
     return { success: false, error: err.message || 'SMTP transmission failure.' };
   }
 }
