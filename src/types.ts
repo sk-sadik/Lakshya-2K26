@@ -8,7 +8,8 @@ export type DepartmentId =
   | 'eee'
   | 'mech'
   | 'civil'
-  | 'aero';
+  | 'aero'
+  | 'mba';
 
 export type EventCategory = 
   | 'all'
@@ -146,6 +147,7 @@ export interface Registration {
   studentName: string;
   studentEmail: string;
   studentPhone?: string;
+  studentRollNo?: string;
   eventId: string;
   eventName: string;
   college: string;

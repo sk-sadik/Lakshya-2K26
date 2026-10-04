@@ -17,7 +17,7 @@ export const PassGenerator3D: React.FC<PassGenerator3DProps> = ({
   const [name, setName] = useState(initialName);
   const [college, setCollege] = useState(initialCollege);
   const [department, setDepartment] = useState(initialDepartment);
-  const [role, setRole] = useState<'Standard Delegate' | 'Hacker' | 'VIP All-Access' | 'Robotics Lead'>('Standard Delegate');
+  const [role] = useState<'Participant'>('Participant');
   const [passId] = useState(() => `LK-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(100 + Math.random() * 900)}`);
   
   // 3D Card tilt state
@@ -101,8 +101,8 @@ export const PassGenerator3D: React.FC<PassGenerator3DProps> = ({
       ctx.font = '24px Rajdhani, sans-serif';
       ctx.fillText('LBRCE NATIONAL LEVEL TECH FEST • 2026', 400, 160);
 
-      // Pass Type Badge
-      ctx.fillStyle = role === 'Hacker' ? '#ec4899' : role === 'VIP All-Access' ? '#a855f7' : '#06b6d4';
+      // Pass Type Badge (Participant tier only)
+      ctx.fillStyle = '#06b6d4';
       ctx.fillRect(200, 260, 400, 60);
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 30px Rajdhani, sans-serif';
@@ -164,32 +164,11 @@ export const PassGenerator3D: React.FC<PassGenerator3DProps> = ({
   };
 
   const getRoleColors = () => {
-    switch (role) {
-      case 'Hacker':
-        return {
-          glow: 'from-pink-500/40 via-purple-600/30 to-cyan-500/30',
-          badge: 'bg-pink-500/20 text-pink-300 border-pink-500/50',
-          accent: 'text-pink-400'
-        };
-      case 'VIP All-Access':
-        return {
-          glow: 'from-purple-600/40 via-pink-600/30 to-fuchsia-500/30',
-          badge: 'bg-purple-500/20 text-purple-300 border-purple-500/50',
-          accent: 'text-purple-400'
-        };
-      case 'Robotics Lead':
-        return {
-          glow: 'from-cyan-500/40 via-blue-600/30 to-purple-600/30',
-          badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50',
-          accent: 'text-cyan-400'
-        };
-      default:
-        return {
-          glow: 'from-purple-500/30 via-pink-500/20 to-cyan-500/30',
-          badge: 'bg-pink-500/20 text-pink-300 border-pink-500/40',
-          accent: 'text-pink-400'
-        };
-    }
+    return {
+      glow: 'from-purple-500/30 via-pink-500/20 to-cyan-500/30',
+      badge: 'bg-pink-500/20 text-pink-300 border-pink-500/40',
+      accent: 'text-pink-400'
+    };
   };
 
   const roleStyles = getRoleColors();
@@ -261,32 +240,8 @@ export const PassGenerator3D: React.FC<PassGenerator3DProps> = ({
                   <option value="Mechanical Engineering">Mechanical (CAD/Engines)</option>
                   <option value="Civil Engineering">Civil Engineering</option>
                   <option value="Aerospace Engineering">Aerospace Engineering</option>
+                  <option value="Management Studies">Management Studies (MBA)</option>
                 </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
-                Pass Access Tier
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(['Standard Delegate', 'Hacker', 'VIP All-Access', 'Robotics Lead'] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => {
-                      setRole(item);
-                      SoundEngine.playHover();
-                    }}
-                    className={`px-3 py-2 rounded-lg text-xs font-tech font-bold uppercase tracking-wider border transition-all cursor-pointer ${
-                      role === item
-                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 border-pink-400 text-white shadow-md shadow-pink-600/30'
-                        : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-purple-800 hover:text-slate-200'
-                    }`}
-                  >
-                    {item.split(' ')[0]}
-                  </button>
-                ))}
               </div>
             </div>
 

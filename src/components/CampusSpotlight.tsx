@@ -10,12 +10,49 @@ import {
   GraduationCap,
   Upload,
   Image as ImageIcon,
-  RotateCcw
+  RotateCcw,
+  Crown,
+  Users,
+  Landmark
 } from 'lucide-react';
 import { SoundEngine } from './AudioEngine';
 
-const CAMPUS_IMAGE_STORAGE_KEY = 'lakshya_campus_image';
-const DEFAULT_CAMPUS_IMAGE = '/assets/lbrce_campus.jpg';
+const TRUST_MANAGEMENT = [
+  {
+    name: 'Late Sri Lakireddy Bali Reddy',
+    role: 'Founder Chairman',
+    photoSrc: '/assets/founder-bali-reddy.jpg',
+  },
+  {
+    name: 'Sri Lakireddy Prasad Reddy',
+    role: 'Chairman',
+    photoSrc: '/assets/chairman-prasad-reddy.jpg',
+  },
+  {
+    name: 'Sri Lakireddy Jayaprakash Reddy',
+    role: 'Co-Founder & Honorary Chairman',
+    photoSrc: '/assets/honorary-jayaprakash-reddy.jpg',
+  },
+  {
+    name: 'Sri G. Srinivasa Reddy',
+    role: 'President (LBRCE)',
+    photoSrc: '/assets/president-srinivasa-reddy.jpg',
+  },
+];
+
+const EXECUTIVE_LEADERSHIP = [
+  {
+    name: 'Dr. K. Appa Rao',
+    role: 'Principal',
+  },
+  {
+    name: 'Dr. B. Ramesh Reddy',
+    role: 'Vice-Principal',
+  },
+];
+
+const CAMPUS_IMAGE_STORAGE_KEY = 'lakshya_campus_image_v2';
+const DEFAULT_CAMPUS_IMAGE = '/assets/lbrce-admin-block-real.jpg';
 
 export const CampusSpotlight: React.FC = () => {
   const [campusImage, setCampusImage] = useState<string>(() => {
@@ -222,7 +259,7 @@ export const CampusSpotlight: React.FC = () => {
                     <Layers className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                     <div>
                       <h4 className="text-xs font-bold text-white uppercase tracking-wide">65-Acre Sprawling Green Campus</h4>
-                      <p className="text-[11px] text-slate-300 font-mono">8 specialized department arena blocks & innovation center</p>
+                      <p className="text-[11px] text-slate-300 font-mono">10 department arena blocks including MBA & innovation center</p>
                     </div>
                   </div>
                 </div>
@@ -256,6 +293,88 @@ export const CampusSpotlight: React.FC = () => {
 
             </div>
 
+          </div>
+        </div>
+
+        {/* Founder & Trust Management + Executive Leadership */}
+        <div className="mt-10 rounded-3xl bg-slate-950/90 border border-purple-800/60 shadow-2xl shadow-purple-950/60 overflow-hidden backdrop-blur-xl p-6 sm:p-8 lg:p-10">
+          <div className="text-center max-w-2xl mx-auto mb-8">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-amber-500/40 bg-amber-950/30 text-amber-300 text-xs font-mono font-bold tracking-wider uppercase mb-3">
+              <Landmark className="w-3.5 h-3.5 text-amber-400" />
+              <span>College Leadership</span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
+              Founder & Institution Leadership
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-400 mt-2 font-sans">
+              Guided by visionary founders and led by experienced academic executives.
+            </p>
+          </div>
+
+          {/* Founder & Trust Management */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Crown className="w-4 h-4 text-amber-400" />
+              <h4 className="text-xs font-mono uppercase font-bold tracking-widest text-amber-300">
+                Founder & Trust Management
+              </h4>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {TRUST_MANAGEMENT.map((person) => (
+                <div
+                  key={person.name}
+                  className="p-4 rounded-2xl bg-slate-900/80 border border-purple-900/40 hover:border-amber-500/50 transition-colors text-center"
+                >
+                  <div className="w-28 h-28 mx-auto mb-3 rounded-2xl overflow-hidden border-2 border-amber-500/60 shadow-lg shadow-amber-950/40 bg-slate-800 flex items-center justify-center">
+                    <img
+                      src={person.photoSrc}
+                      alt={`${person.name} — ${person.role}`}
+                      className="w-full h-full object-cover object-top"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <h5 className="text-sm font-bold text-white font-heading leading-snug">
+                    {person.name}
+                  </h5>
+                  <p className="text-[11px] font-mono uppercase tracking-wider text-amber-300/90 mt-1">
+                    {person.role}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* College Executive Leadership */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="w-4 h-4 text-cyan-400" />
+              <h4 className="text-xs font-mono uppercase font-bold tracking-widest text-cyan-300">
+                College Executive Leadership
+              </h4>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+              {EXECUTIVE_LEADERSHIP.map((person) => (
+                <div
+                  key={person.name}
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-slate-900/80 border border-purple-900/40 hover:border-cyan-500/50 transition-colors"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center text-cyan-300 shrink-0">
+                    <GraduationCap className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-white font-heading">
+                      {person.name}
+                    </h5>
+                    <p className="text-[11px] font-mono uppercase tracking-wider text-cyan-300/90">
+                      {person.role}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

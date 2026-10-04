@@ -2,7 +2,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface INotification extends Document {
   userId: string; // 'all' or specific userId or role
-  targetRole?: 'all' | 'student' | 'coordinator' | 'admin';
+  // 'event' = targeted to specific event registrants only (matched via userId, invisible to role-wide queries)
+  targetRole?: 'all' | 'student' | 'coordinator' | 'admin' | 'event';
   title: string;
   message: string;
   type: 'info' | 'success' | 'warning' | 'alert';
@@ -22,7 +23,7 @@ const NotificationSchema = new Schema<INotification>(
     },
     targetRole: {
       type: String,
-      enum: ['all', 'student', 'coordinator', 'admin'],
+      enum: ['all', 'student', 'coordinator', 'admin', 'event'],
       default: 'all',
       index: true,
     },

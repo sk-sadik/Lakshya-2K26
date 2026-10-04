@@ -9,6 +9,7 @@ export interface IRegistration extends Document {
   studentName: string;
   studentEmail: string;
   studentPhone?: string;
+  studentRollNo?: string;
   event: mongoose.Types.ObjectId;
   eventId: string;
   eventName: string;
@@ -57,6 +58,11 @@ const RegistrationSchema = new Schema<IRegistration>(
     studentPhone: {
       type: String,
       trim: true,
+    },
+    studentRollNo: {
+      type: String,
+      trim: true,
+      uppercase: true,
     },
     event: {
       type: Schema.Types.ObjectId,

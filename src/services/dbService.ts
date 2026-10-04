@@ -1,4 +1,4 @@
-import {
+﻿import {
   User,
   ManagedEvent,
   Registration,
@@ -38,11 +38,11 @@ export function managedEventToEventItem(m: ManagedEvent): EventItem {
         : m.description || 'Official LBRCE Lakshya Competition',
     description: m.description || 'LBRCE Lakshya 2026 National Level Symposium competition.',
     prizes: {
-      first: m.prizes?.first || '₹10,000',
-      second: m.prizes?.second || '₹5,000',
+      first: m.prizes?.first || 'â‚¹10,000',
+      second: m.prizes?.second || 'â‚¹5,000',
       third: m.prizes?.third,
     },
-    entryFee: m.entryFee || '₹150',
+    entryFee: m.entryFee || 'â‚¹150',
     teamSize: m.teamSize || '1-3 Members',
     venue: m.venue || 'LBRCE Campus',
     timing: m.time || '10:00 AM - 01:00 PM',
@@ -104,6 +104,43 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+export const SESSION_INVALIDATED_EVENT = 'lakshya:session-invalidated';
+
+function notifySessionInvalidated(): void {
+  try {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(REGISTRATIONS_CACHE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new Event(SESSION_INVALIDATED_EVENT));
+  }
+}
+
+// Central fetch wrapper: detects stale/invalid session tokens (e.g. account deleted,
+// token expired, session revoked) and automatically signs the user out site-wide.
+async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const doFetch = globalThis.fetch.bind(globalThis);
+  const res = await doFetch(url, options);
+
+  if (res.status === 401) {
+    try {
+      const clone = res.clone();
+      const data = await clone.json();
+      const message = (data && data.message) || '';
+      if (/token|session|not authenticated|no longer exists|authentication/i.test(message)) {
+        notifySessionInvalidated();
+      }
+    } catch {
+      // 401 without a parseable body; ignore
+    }
+  }
+
+  return res;
+}
+
 export class DatabaseService {
   private eventsCache: ManagedEvent[] = [];
   private registrationsCache: Registration[] = [];
@@ -155,7 +192,7 @@ export class DatabaseService {
 
   public async syncEvents(): Promise<ManagedEvent[]> {
     try {
-      const res = await fetch('/api/events');
+      const res = await authFetch('/api/events');
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.events)) {
@@ -200,7 +237,7 @@ export class DatabaseService {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (!token) return this.registrationsCache;
 
-      const res = await fetch('/api/registrations/my', {
+      const res = await authFetch('/api/registrations/my', {
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -239,7 +276,7 @@ export class DatabaseService {
     password: string,
     role?: UserRole
   ): Promise<Omit<User, 'passwordHash'>> {
-    const res = await fetch('/api/auth/login', {
+    const res = await authFetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, role }),
@@ -273,7 +310,7 @@ export class DatabaseService {
     phone?: string;
     rollNo?: string;
   }): Promise<Omit<User, 'passwordHash'>> {
-    const res = await fetch('/api/auth/register', {
+    const res = await authFetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
@@ -295,7 +332,7 @@ export class DatabaseService {
   }
 
   public async verifyEmail(email: string, otp: string): Promise<Omit<User, 'passwordHash'>> {
-    const res = await fetch('/api/auth/verify-email', {
+    const res = await authFetch('/api/auth/verify-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, otp }),
@@ -313,7 +350,7 @@ export class DatabaseService {
   }
 
   public async resendOTP(email: string, purpose: 'EMAIL_VERIFY' | 'PASSWORD_RESET' = 'EMAIL_VERIFY'): Promise<string> {
-    const res = await fetch('/api/auth/resend-otp', {
+    const res = await authFetch('/api/auth/resend-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, purpose }),
@@ -327,7 +364,7 @@ export class DatabaseService {
   }
 
   public async forgotPassword(email: string): Promise<string> {
-    const res = await fetch('/api/auth/forgot-password', {
+    const res = await authFetch('/api/auth/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -341,7 +378,7 @@ export class DatabaseService {
   }
 
   public async verifyResetOTP(email: string, otp: string): Promise<string> {
-    const res = await fetch('/api/auth/verify-reset-otp', {
+    const res = await authFetch('/api/auth/verify-reset-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, otp }),
@@ -355,7 +392,7 @@ export class DatabaseService {
   }
 
   public async resetPassword(email: string, newPassword: string, otp?: string): Promise<string> {
-    const res = await fetch('/api/auth/reset-password', {
+    const res = await authFetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, newPassword, otp }),
@@ -385,7 +422,7 @@ export class DatabaseService {
   }
 
   public async createEvent(eventData: Partial<ManagedEvent>): Promise<ManagedEvent> {
-    const res = await fetch('/api/events', {
+    const res = await authFetch('/api/events', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(eventData),
@@ -402,7 +439,7 @@ export class DatabaseService {
   }
 
   public async updateEvent(id: string, updates: Partial<ManagedEvent>): Promise<ManagedEvent> {
-    const res = await fetch(`/api/events/${id}`, {
+    const res = await authFetch(`/api/events/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(updates),
@@ -419,7 +456,7 @@ export class DatabaseService {
   }
 
   public async deleteEvent(id: string): Promise<void> {
-    const res = await fetch(`/api/events/${id}`, {
+    const res = await authFetch(`/api/events/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -444,11 +481,12 @@ export class DatabaseService {
     studentName: string;
     studentEmail: string;
     studentPhone?: string;
+    studentRollNo?: string;
     college?: string;
     department?: string;
     teamMembers?: string;
   }): Promise<{ registration: Registration; isPaid?: boolean; paymentOrder?: any }> {
-    const res = await fetch(`/api/events/${details.eventId}/register`, {
+    const res = await authFetch(`/api/events/${details.eventId}/register`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(details),
@@ -468,7 +506,7 @@ export class DatabaseService {
   }
 
   public async createPaymentOrder(registrationId: string): Promise<any> {
-    const res = await fetch('/api/payment/create-order', {
+    const res = await authFetch('/api/payment/create-order', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ registrationId }),
@@ -487,7 +525,7 @@ export class DatabaseService {
     razorpay_payment_id: string;
     razorpay_signature: string;
   }): Promise<{ registration: Registration; qrToken: string; qrCodeDataUrl: string }> {
-    const res = await fetch('/api/payment/verify', {
+    const res = await authFetch('/api/payment/verify', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(paymentData),
@@ -507,7 +545,7 @@ export class DatabaseService {
   }
 
   public async cancelRegistration(id: string): Promise<void> {
-    const res = await fetch(`/api/registrations/${id}/cancel`, {
+    const res = await authFetch(`/api/registrations/${id}/cancel`, {
       method: 'PUT',
       headers: getAuthHeaders(),
     });
@@ -521,7 +559,7 @@ export class DatabaseService {
   }
 
   public async deleteRegistration(id: string): Promise<void> {
-    const res = await fetch(`/api/registrations/${id}`, {
+    const res = await authFetch(`/api/registrations/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -536,7 +574,7 @@ export class DatabaseService {
   }
 
   public async checkInAttendee(tokenOrId: string): Promise<any> {
-    const res = await fetch('/api/registrations/check-in', {
+    const res = await authFetch('/api/registrations/check-in', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ tokenOrId }),
@@ -553,7 +591,7 @@ export class DatabaseService {
   public async getUsers(role?: UserRole): Promise<User[]> {
     try {
       const url = role ? `/api/admin/users?role=${role}` : '/api/admin/users';
-      const res = await fetch(url, { headers: getAuthHeaders() });
+      const res = await authFetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         return data.users || [];
@@ -565,7 +603,7 @@ export class DatabaseService {
   }
 
   public async addUserAdmin(userData: any): Promise<User> {
-    const res = await fetch('/api/admin/users', {
+    const res = await authFetch('/api/admin/users', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(userData),
@@ -587,7 +625,7 @@ export class DatabaseService {
       payload.password = payload.newPassword;
     }
 
-    const res = await fetch(`/api/admin/users/${id}`, {
+    const res = await authFetch(`/api/admin/users/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
@@ -608,7 +646,7 @@ export class DatabaseService {
   }
 
   public async deleteUser(id: string): Promise<void> {
-    const res = await fetch(`/api/admin/users/${id}`, {
+    const res = await authFetch(`/api/admin/users/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -647,7 +685,7 @@ export class DatabaseService {
     ];
 
     try {
-      const res = await fetch('/api/admin/analytics', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/admin/analytics', { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         if (data.analytics) {
@@ -688,7 +726,7 @@ export class DatabaseService {
               deptStats: [],
               popularEvents: [],
             },
-            totalRevenue: data.analytics.totalRevenue || '₹0',
+            totalRevenue: data.analytics.totalRevenue || 'â‚¹0',
             checkedInRegistrations: data.analytics.checkedInRegistrations ?? 0,
           };
         }
@@ -702,7 +740,7 @@ export class DatabaseService {
       users: { total: 0, students: 0, coordinators: 0, admins: 0, lbrceRegisteredStudents: 0, otherCollegeStudents: 0, participatingColleges: 0 },
       events: { total: this.eventsCache.length || 0, upcoming: this.eventsCache.length || 0, ongoing: 0, completed: 0, cancelled: 0, deptWise: {} },
       registrations: { total: this.registrationsCache.length || 0, active: 0, participatingStudents: 0, lbrceRegistrations: 0, otherCollegeRegistrations: 0, multiEventStudentsCount: 0, collegeStats: [], deptStats: [], popularEvents: [] },
-      totalRevenue: '₹0',
+      totalRevenue: 'â‚¹0',
       checkedInRegistrations: 0,
     };
   }
@@ -767,7 +805,7 @@ export class DatabaseService {
       const url = role
         ? `/api/admin/notifications?role=${role}&userId=${userId}`
         : `/api/admin/notifications?userId=${userId}`;
-      const res = await fetch(url, { headers: getAuthHeaders() });
+      const res = await authFetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         return data.notifications || [];
@@ -779,7 +817,7 @@ export class DatabaseService {
   }
 
   public async sendNotification(notifData: any): Promise<NotificationItem> {
-    const res = await fetch('/api/admin/notifications', {
+    const res = await authFetch('/api/admin/notifications', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(notifData),
@@ -792,7 +830,7 @@ export class DatabaseService {
   }
 
   public async deleteNotification(id: string): Promise<void> {
-    await fetch(`/api/admin/notifications/${id}`, {
+    await authFetch(`/api/admin/notifications/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -800,7 +838,7 @@ export class DatabaseService {
 
   public async getAdminAnnouncements(): Promise<NotificationItem[]> {
     try {
-      const res = await fetch('/api/admin/announcements', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/admin/announcements', { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         return data.announcements || [];
@@ -814,7 +852,7 @@ export class DatabaseService {
   // Support Reports
   public async getReports(): Promise<SupportReport[]> {
     try {
-      const res = await fetch('/api/admin/reports', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/admin/reports', { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         return data.reports || [];
@@ -826,7 +864,7 @@ export class DatabaseService {
   }
 
   public async createReport(reportData: any): Promise<SupportReport> {
-    const res = await fetch('/api/admin/reports', {
+    const res = await authFetch('/api/admin/reports', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(reportData),
@@ -839,7 +877,7 @@ export class DatabaseService {
   }
 
   public async updateReportStatus(id: string, status: string): Promise<void> {
-    await fetch(`/api/admin/reports/${id}`, {
+    await authFetch(`/api/admin/reports/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ status }),
@@ -847,7 +885,7 @@ export class DatabaseService {
   }
 
   public async replyToReport(id: string, reply: string): Promise<void> {
-    await fetch(`/api/admin/reports/${id}`, {
+    await authFetch(`/api/admin/reports/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ adminReply: reply, status: 'resolved', repliedAt: new Date() }),
@@ -855,10 +893,53 @@ export class DatabaseService {
   }
 
   public async deleteReport(id: string): Promise<void> {
-    await fetch(`/api/admin/reports/${id}`, {
+    await authFetch(`/api/admin/reports/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
+  }
+
+  // Coordinator -> own event registrants ONLY announcements
+  public async sendCoordinatorAnnouncement(data: {
+    eventId: string;
+    title: string;
+    message: string;
+    type?: string;
+  }): Promise<{ count: number; eventName: string; message: string }> {
+    const res = await authFetch('/api/coordinator/announcements', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    const resData = await res.json();
+    if (!res.ok) {
+      throw new Error(resData.message || 'Failed to send announcement.');
+    }
+    return resData;
+  }
+
+  public async getCoordinatorAnnouncements(): Promise<NotificationItem[]> {
+    try {
+      const res = await authFetch('/api/coordinator/announcements', { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        return data.announcements || [];
+      }
+    } catch {
+      // safe fallback
+    }
+    return [];
+  }
+
+  public async getEventRecipientCount(eventId: string): Promise<{ count: number; eventName: string }> {
+    const res = await authFetch(`/api/coordinator/events/${eventId}/recipient-count`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || 'Failed to fetch recipient count.');
+    }
+    return data;
   }
 
   // Real OTP Service APIs
@@ -867,7 +948,7 @@ export class DatabaseService {
     purpose: 'EMAIL_VERIFY' | 'PASSWORD_RESET' = 'EMAIL_VERIFY',
     name?: string
   ): Promise<{ success: boolean; message: string; emailDelivered: boolean; emailError?: string }> {
-    const res = await fetch('/api/auth/send-otp', {
+    const res = await authFetch('/api/auth/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, purpose, name }),
@@ -885,7 +966,7 @@ export class DatabaseService {
     otp: string,
     purpose: 'EMAIL_VERIFY' | 'PASSWORD_RESET' = 'EMAIL_VERIFY'
   ): Promise<{ success: boolean; message: string; verified: boolean; user?: any }> {
-    const res = await fetch('/api/auth/verify-otp', {
+    const res = await authFetch('/api/auth/verify-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, otp, purpose }),
@@ -903,7 +984,7 @@ export class DatabaseService {
     mealType?: string,
     email?: string
   ): Promise<{ success: boolean; message: string; coupon: FoodCoupon; emailDelivered: boolean; emailError?: string }> {
-    const res = await fetch('/api/coupons/generate', {
+    const res = await authFetch('/api/coupons/generate', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ mealType, email }),
@@ -917,7 +998,7 @@ export class DatabaseService {
   }
 
   public async sendFoodCouponEmail(couponId: string): Promise<{ success: boolean; message: string; coupon: FoodCoupon; emailDelivered: boolean }> {
-    const res = await fetch(`/api/coupons/${encodeURIComponent(couponId)}/send-email`, {
+    const res = await authFetch(`/api/coupons/${encodeURIComponent(couponId)}/send-email`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -931,7 +1012,7 @@ export class DatabaseService {
 
   public async getMyFoodCoupons(): Promise<FoodCoupon[]> {
     try {
-      const res = await fetch('/api/coupons/my', {
+      const res = await authFetch('/api/coupons/my', {
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -945,7 +1026,7 @@ export class DatabaseService {
   }
 
   public async getFoodCoupon(idOrCode: string): Promise<FoodCoupon> {
-    const res = await fetch(`/api/coupons/${encodeURIComponent(idOrCode)}`, {
+    const res = await authFetch(`/api/coupons/${encodeURIComponent(idOrCode)}`, {
       headers: getAuthHeaders(),
     });
     const data = await res.json();
@@ -959,7 +1040,7 @@ export class DatabaseService {
     couponIdOrCode: string,
     staffName?: string
   ): Promise<{ success: boolean; message: string; coupon: FoodCoupon }> {
-    const res = await fetch('/api/coupons/redeem', {
+    const res = await authFetch('/api/coupons/redeem', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ couponCode: couponIdOrCode, staffName }),
@@ -975,7 +1056,7 @@ export class DatabaseService {
   public async verifyFoodCoupon(
     couponCode: string
   ): Promise<{ success: boolean; isValid: boolean; status: string; coupon: FoodCoupon }> {
-    const res = await fetch('/api/coupons/verify', {
+    const res = await authFetch('/api/coupons/verify', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ couponCode }),
@@ -990,7 +1071,7 @@ export class DatabaseService {
 
   public async getAllFoodCoupons(): Promise<{ coupons: FoodCoupon[]; total: number; activeCount: number; usedCount: number }> {
     try {
-      const res = await fetch('/api/coupons', {
+      const res = await authFetch('/api/coupons', {
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -1017,7 +1098,7 @@ export class DatabaseService {
     };
     tokens: FoodCoupon[];
   }> {
-    const res = await fetch('/api/coupons/bulk-generate-for-participants', {
+    const res = await authFetch('/api/coupons/bulk-generate-for-participants', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ eventId, mealType }),
@@ -1043,7 +1124,7 @@ export class DatabaseService {
         const s = qs.toString();
         if (s) url += `?${s}`;
       }
-      const res = await fetch(url, { headers: getAuthHeaders() });
+      const res = await authFetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         return data.registrations || [];
@@ -1055,7 +1136,7 @@ export class DatabaseService {
   }
 
   public async sendCouponEmailsToParticipants(eventId?: string): Promise<any> {
-    const res = await fetch('/api/coupons/send-emails-to-participants', {
+    const res = await authFetch('/api/coupons/send-emails-to-participants', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ eventId: eventId || undefined }),
@@ -1069,7 +1150,7 @@ export class DatabaseService {
   }
 
   public async sendCouponToEmail(email: string, name?: string, mealType?: string): Promise<any> {
-    const res = await fetch('/api/coupons/send-to-email', {
+    const res = await authFetch('/api/coupons/send-to-email', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ email, name, mealType }),

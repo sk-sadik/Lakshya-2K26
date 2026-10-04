@@ -22,7 +22,7 @@ import { DepartmentId, EventItem, User, UserRole } from './types';
 import { FEST_METRICS } from './data/lakshyaData';
 import { Trophy, Users, Calendar, Sparkles, Cpu, LogIn, ArrowRight } from 'lucide-react';
 import { SoundEngine } from './components/AudioEngine';
-import { dbService } from './services/dbService';
+import { dbService, SESSION_INVALIDATED_EVENT } from './services/dbService';
 
 export default function App() {
   const [selectedDept, setSelectedDept] = useState<DepartmentId>('all');
@@ -49,6 +49,18 @@ export default function App() {
       setCurrentUser(user);
       setActiveDashboardRole(user.role || (user.roles?.[0]) || 'student');
     }
+  }, []);
+
+  // Auto sign-out site-wide when the backend reports a stale/invalid session token
+  useEffect(() => {
+    const handleSessionInvalidated = () => {
+      setCurrentUser(null);
+      setCurrentView('main');
+      setIsLoginOpen(true);
+      SoundEngine.playClick();
+    };
+    window.addEventListener(SESSION_INVALIDATED_EVENT, handleSessionInvalidated);
+    return () => window.removeEventListener(SESSION_INVALIDATED_EVENT, handleSessionInvalidated);
   }, []);
 
   // Smooth scroll to events section when clicking on arena

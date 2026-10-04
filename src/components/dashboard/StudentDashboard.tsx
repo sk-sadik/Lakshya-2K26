@@ -90,6 +90,53 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [selectedQrPass, setSelectedQrPass] = useState<Registration | null>(null);
   const [payingRegId, setPayingRegId] = useState<string | null>(null);
 
+  // Registration details form (name + roll no + teammates) shown BEFORE payment
+  const [registerFormEvent, setRegisterFormEvent] = useState<ManagedEvent | null>(null);
+  const [regFormName, setRegFormName] = useState('');
+  const [regFormPhone, setRegFormPhone] = useState('');
+  const [regFormRollNo, setRegFormRollNo] = useState('');
+  const [regFormCollege, setRegFormCollege] = useState('');
+  const [regFormDept, setRegFormDept] = useState('');
+  const [regFormTeam, setRegFormTeam] = useState<{ name: string; rollNo: string }[]>([
+    { name: '', rollNo: '' },
+    { name: '', rollNo: '' },
+    { name: '', rollNo: '' },
+    { name: '', rollNo: '' },
+    { name: '', rollNo: '' },
+  ]);
+  const [regFormError, setRegFormError] = useState<string | null>(null);
+  const [regFormSubmitting, setRegFormSubmitting] = useState(false);
+
+  const getFormMaxTeamSize = (teamSize?: string): number => {
+    const nums = (teamSize || '').match(/\d+/g)?.map(Number) || [];
+    if (nums.length === 0) return 4;
+    return Math.min(Math.max(...nums), 6);
+  };
+  const formMaxTeam = getFormMaxTeamSize(registerFormEvent?.teamSize);
+  const formIsTeamEvent = formMaxTeam > 1 && registerFormEvent?.teamSize !== 'Individual (1)';
+  const formExtraSlots = formIsTeamEvent ? Math.min(formMaxTeam - 1, 5) : 0;
+
+  const openRegisterForm = (event: ManagedEvent) => {
+    SoundEngine.playClick();
+    setRegisterError(null);
+    setRegisterSuccess(null);
+    setRegFormError(null);
+    setRegFormName(user.name);
+    setRegFormPhone(user.phone || '');
+    setRegFormRollNo(user.rollNo || '');
+    setRegFormCollege(user.college);
+    setRegFormDept(user.department);
+    setRegFormTeam([
+      { name: '', rollNo: '' },
+      { name: '', rollNo: '' },
+      { name: '', rollNo: '' },
+      { name: '', rollNo: '' },
+      { name: '', rollNo: '' },
+    ]);
+    setSelectedEventDetails(null);
+    setRegisterFormEvent(event);
+  };
+
   // Load fresh data from db
   const reloadData = async () => {
     setEvents(dbService.getEvents());
@@ -162,19 +209,47 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     });
   };
 
-  const handleRegisterEvent = async (event: ManagedEvent) => {
+  const submitRegisterForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registerFormEvent) return;
+    const event = registerFormEvent;
+    setRegFormError(null);
     setRegisterError(null);
     setRegisterSuccess(null);
+
+    if (!regFormName.trim() || !regFormPhone.trim() || !regFormRollNo.trim() || !regFormCollege.trim()) {
+      setRegFormError('Please fill Name, Mobile, Roll No and College before proceeding to pay.');
+      return;
+    }
+    if (formIsTeamEvent) {
+      for (let i = 0; i < formExtraSlots; i++) {
+        const row = regFormTeam[i];
+        const hasName = row.name.trim().length > 0;
+        const hasRoll = row.rollNo.trim().length > 0;
+        if ((hasName && !hasRoll) || (!hasName && hasRoll)) {
+          setRegFormError(`Team Member ${i + 2}: both Name and Roll No are required together (or leave both empty).`);
+          return;
+        }
+      }
+    }
+    const teamMembersStr = formIsTeamEvent
+      ? regFormTeam.slice(0, formExtraSlots).filter((r) => r.name.trim() && r.rollNo.trim()).map((r) => `${r.name.trim()} (${r.rollNo.trim().toUpperCase()})`).join(', ') || undefined
+      : undefined;
+
     try {
+      setRegFormSubmitting(true);
       const res = await dbService.registerForEvent({
         eventId: event.id,
         studentId: user.id,
-        studentName: user.name,
+        studentName: regFormName.trim(),
         studentEmail: user.email,
-        studentPhone: user.phone,
-        college: user.college,
-        department: user.department
+        studentPhone: regFormPhone.trim(),
+        studentRollNo: regFormRollNo.trim().toUpperCase(),
+        college: regFormCollege.trim(),
+        department: regFormDept || user.department,
+        teamMembers: teamMembersStr,
       });
+      setRegisterFormEvent(null);
 
       // Free Event -> Instantly confirmed
       if (!res.isPaid) {
@@ -259,8 +334,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         setRegisterError('Failed to initialize payment gateway. Please try again.');
       }
     } catch (err: any) {
+      setRegFormError(err.message || 'Registration failed. Please try again.');
       setRegisterError(err.message || 'Registration failed. Please try again.');
       setTimeout(() => setRegisterError(null), 5000);
+    } finally {
+      setRegFormSubmitting(false);
     }
   };
 
@@ -642,7 +720,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <div className="p-4 rounded-2xl bg-slate-900/80 border border-purple-900/50">
                 <span className="text-[11px] font-mono text-pink-300 uppercase block mb-1">Departments</span>
                 <span className="text-3xl font-tech font-extrabold text-pink-400">
-                  9 Branches
+                  10 Branches
                 </span>
               </div>
               <div className="p-4 rounded-2xl bg-slate-900/80 border border-purple-900/50">
@@ -741,7 +819,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 All College Events
               </h2>
               <p className="text-xs sm:text-sm text-slate-300">
-                Browse and register for all national-level technical competitions across 9 branches.
+                Browse and register for all national-level technical competitions across 10 branches.
               </p>
             </div>
 
@@ -764,7 +842,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 onChange={(e) => setSelectedDeptFilter(e.target.value as DepartmentId)}
                 className="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-purple-900/60 text-white text-xs font-mono focus:outline-none focus:border-pink-500"
               >
-                <option value="all">All Departments (9 Branches)</option>
+                <option value="all">All Departments (10 Branches)</option>
                 {DEPARTMENTS.map((dept) => (
                   <option key={dept.id} value={dept.id}>
                     {dept.name.split(' (')[0]}
@@ -841,7 +919,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                         )
                       ) : (
                         <button
-                          onClick={() => handleRegisterEvent(event)}
+                          onClick={() => openRegisterForm(event)}
                           className="flex-1 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-tech font-bold uppercase shadow-lg shadow-pink-600/30 cursor-pointer"
                         >
                           Register
@@ -860,7 +938,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-                Participating Departments (9 Branches)
+                Participating Departments (10 Branches)
               </h2>
               <p className="text-xs sm:text-sm text-slate-300">
                 Explore individual department arenas, themes, faculty coordinators, and featured challenges.
@@ -963,7 +1041,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     </button>
                     {!registeredEventIds.has(event.id) ? (
                       <button
-                        onClick={() => handleRegisterEvent(event)}
+                        onClick={() => openRegisterForm(event)}
                         className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-tech font-bold uppercase cursor-pointer"
                       >
                         Register
@@ -1061,11 +1139,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                         <h3 className="text-lg font-bold text-white">{reg.eventName}</h3>
                         <p className="text-xs text-slate-300">
-                          Delegate: <span className="text-white font-medium">{reg.studentName}</span> • College: <span className="text-white">{reg.college}</span>
+                          Delegate: <span className="text-white font-medium">{reg.studentName}</span>
+                          {reg.studentRollNo && (
+                            <span className="text-cyan-300 font-mono"> ({reg.studentRollNo})</span>
+                          )} • College: <span className="text-white">{reg.college}</span>
                         </p>
                         {reg.teamMembers && (
                           <p className="text-xs text-purple-300 font-mono">
-                            Team: {reg.teamMembers}
+                            Team Members + Roll Nos: {reg.teamMembers}
                           </p>
                         )}
                         <div className="flex items-center gap-3 text-[10px] font-mono text-slate-500 pt-1">
@@ -1409,6 +1490,157 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           </div>
         )}
 
+        {/* Registration Details Form Modal (shown BEFORE payment) */}
+        {registerFormEvent && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setRegisterFormEvent(null);
+            }}
+          >
+            <form
+              onSubmit={submitRegisterForm}
+              className="relative w-full max-w-xl rounded-3xl bg-slate-950 border border-purple-800/60 p-6 sm:p-8 space-y-4 my-8"
+            >
+              <button
+                type="button"
+                onClick={() => setRegisterFormEvent(null)}
+                className="absolute right-4 top-4 p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-pink-400 font-bold">
+                  Step 1: Confirm Details • Step 2: Pay
+                </span>
+                <h3 className="text-xl sm:text-2xl font-bold font-heading text-white mt-1">
+                  Register: {registerFormEvent.eventName}
+                </h3>
+                <p className="text-xs text-slate-400 font-mono mt-1">
+                  {registerFormEvent.department.toUpperCase()} • {registerFormEvent.entryFee} • Team: {registerFormEvent.teamSize}
+                </p>
+              </div>
+
+              {regFormError && (
+                <div className="p-3 rounded-xl bg-red-950/70 border border-red-500/50 text-red-200 text-xs font-mono flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{regFormError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-400 mb-1">Full Name *</label>
+                  <input
+                    required
+                    type="text"
+                    value={regFormName}
+                    onChange={(e) => setRegFormName(e.target.value)}
+                    placeholder="Your full name"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-purple-900/60 text-white text-sm focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-400 mb-1">Mobile *</label>
+                  <input
+                    required
+                    type="tel"
+                    value={regFormPhone}
+                    onChange={(e) => setRegFormPhone(e.target.value)}
+                    placeholder="+91 ..."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-purple-900/60 text-white text-sm focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-400 mb-1">Your Roll No *</label>
+                  <input
+                    required
+                    type="text"
+                    value={regFormRollNo}
+                    onChange={(e) => setRegFormRollNo(e.target.value.toUpperCase())}
+                    placeholder="e.g. 23761A05A1"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-purple-900/60 text-white text-sm focus:outline-none focus:border-pink-500 font-mono uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-400 mb-1">Branch / Dept</label>
+                  <select
+                    value={regFormDept}
+                    onChange={(e) => setRegFormDept(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-purple-900/60 text-white text-sm focus:outline-none focus:border-pink-500"
+                  >
+                    {DEPARTMENTS.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-400 mb-1">College *</label>
+                <input
+                  required
+                  type="text"
+                  value={regFormCollege}
+                  onChange={(e) => setRegFormCollege(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-purple-900/60 text-white text-sm focus:outline-none focus:border-pink-500"
+                />
+              </div>
+
+              {formIsTeamEvent && (
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-purple-900/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono uppercase text-slate-300 font-bold">
+                      Other Team Members + Roll Nos
+                    </label>
+                    <span className="text-[10px] font-mono text-slate-500">You are Member 1</span>
+                  </div>
+                  {regFormTeam.slice(0, formExtraSlots).map((row, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => setRegFormTeam((prev) => prev.map((r, i) => (i === idx ? { ...r, name: e.target.value } : r)))}
+                        placeholder={`Member ${idx + 2} Name`}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-purple-900/60 text-white text-xs focus:outline-none focus:border-pink-500"
+                      />
+                      <input
+                        type="text"
+                        value={row.rollNo}
+                        onChange={(e) => setRegFormTeam((prev) => prev.map((r, i) => (i === idx ? { ...r, rollNo: e.target.value.toUpperCase() } : r)))}
+                        placeholder={`Member ${idx + 2} Roll No`}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-purple-900/60 text-white text-xs focus:outline-none focus:border-pink-500 font-mono uppercase"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-purple-950">
+                <button
+                  type="button"
+                  onClick={() => setRegisterFormEvent(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 text-slate-300 text-xs font-tech font-bold uppercase"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={regFormSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 text-white text-xs font-tech font-bold uppercase shadow-lg shadow-pink-600/30 flex items-center gap-2 disabled:opacity-50"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>{regFormSubmitting ? 'Processing...' : `Proceed to Pay ${registerFormEvent.entryFee}`}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Event Details Quick Modal */}
         {selectedEventDetails && (
           <div
@@ -1471,8 +1703,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 {!registeredEventIds.has(selectedEventDetails.id) && (
                   <button
                     onClick={() => {
-                      handleRegisterEvent(selectedEventDetails);
-                      setSelectedEventDetails(null);
+                      openRegisterForm(selectedEventDetails);
                     }}
                     className="px-5 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-tech font-bold uppercase shadow-lg shadow-pink-600/30"
                   >
@@ -1509,9 +1740,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </div>
 
               <h3 className="text-xl font-bold text-white mb-1">{selectedQrPass.eventName}</h3>
-              <p className="text-xs text-slate-300 mb-4">
-                {selectedQrPass.studentName} • {selectedQrPass.college}
+              <p className="text-xs text-slate-300 mb-1">
+                {selectedQrPass.studentName}
+                {selectedQrPass.studentRollNo && (
+                  <span className="text-cyan-300 font-mono"> ({selectedQrPass.studentRollNo})</span>
+                )} • {selectedQrPass.college}
               </p>
+              {selectedQrPass.teamMembers && (
+                <p className="text-[11px] text-purple-300 font-mono mb-3">
+                  Team Members + Roll Nos: {selectedQrPass.teamMembers}
+                </p>
+              )}
 
               {/* QR Code */}
               <div className="p-3 bg-white rounded-2xl inline-block mb-4 shadow-xl">

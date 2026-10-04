@@ -309,7 +309,7 @@ export const DepartmentArenas: React.FC<DepartmentArenasProps> = ({ onSelectDepa
             Department Arenas
           </h2>
           <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
-            Seven specialized engineering departments featuring collegiate domains, AI labs, robotics challenges, and competitive prize pools.
+            Ten engineering & management departments featuring collegiate domains, AI labs, robotics challenges, MBA strategy battles, and competitive prize pools.
             <span className="hidden lg:inline"> Rotate the interactive cylinder or switch views to inspect each collegiate domain.</span>
           </p>
         </div>
@@ -469,7 +469,7 @@ export const DepartmentArenas: React.FC<DepartmentArenasProps> = ({ onSelectDepa
                     transitionDuration: isDragging ? '0ms' : '450ms'
                   }}
                 >
-                  {/* 8 Cylindrical Facet Cards */}
+                  {/* 10 Cylindrical Facet Cards */}
                   {DEPARTMENTS.map((dept, idx) => {
                     const cardAngle = idx * angleStep;
                     // Compute angle relative to front
@@ -686,7 +686,7 @@ export const DepartmentArenas: React.FC<DepartmentArenasProps> = ({ onSelectDepa
                         border: `1px solid ${activeDepartment.accentColor}40`
                       }}
                     >
-                      SECTOR {activeIdx + 1} OF 8 • ACTIVE DOCK
+                      SECTOR {activeIdx + 1} OF 10 • ACTIVE DOCK
                     </span>
                     <span className="text-xs font-mono text-slate-400">
                       Branch: {activeDepartment.name}

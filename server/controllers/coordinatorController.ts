@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { User } from '../models/User';
 import { Coordinator } from '../models/Coordinator';
 import { Event } from '../models/Event';
+import { Notification } from '../models/Notification';
 import { AuthenticatedRequest, AuthUser } from '../middleware/auth';
 
 // Helper to get coordinator entity from either User or Coordinator collection
@@ -216,5 +217,168 @@ export async function getCoordinatorAnalytics(req: AuthenticatedRequest, res: Re
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message || 'Error fetching analytics.' });
+  }
+}
+
+// POST /api/coordinator/announcements
+// Coordinator sends an announcement ONLY to students registered for one of their own events.
+// One per-student notification is created (targetRole 'event') so no other user can see it.
+export async function sendEventAnnouncement(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Not authenticated.' });
+      return;
+    }
+
+    const { eventId, title, message, type } = req.body;
+    if (!eventId || !title?.trim() || !message?.trim()) {
+      res.status(400).json({ success: false, message: 'Event, title and message are required.' });
+      return;
+    }
+
+    // Locate event by ObjectId or customId
+    let event: any = null;
+    if (String(eventId).match(/^[0-9a-fA-F]{24}$/)) {
+      event = await Event.findById(eventId);
+    }
+    if (!event) {
+      event = await Event.findOne({ customId: eventId });
+    }
+    if (!event) {
+      res.status(404).json({ success: false, message: 'Event not found.' });
+      return;
+    }
+
+    // Ownership check: coordinator must own the event (admins bypass)
+    const roles = (req.user as AuthUser)?.roles || [];
+    const isAdmin = roles.includes('admin');
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const ownsEvent =
+      String(event.coordinator || '') === String(req.user._id) ||
+      (event.coordinatorEmail || '').toLowerCase().trim() === userEmail;
+    if (!ownsEvent && !isAdmin) {
+      res.status(403).json({ success: false, message: 'You can only send announcements for your own events.' });
+      return;
+    }
+
+    // Active registrants of this event only
+    const { Registration } = await import('../models/Registration');
+    const regs = await Registration.find({
+      $or: [
+        { event: event._id },
+        { eventId: event._id.toString() },
+        ...(event.customId ? [{ eventId: event.customId }] : []),
+      ],
+      registrationStatus: { $in: ['CONFIRMED', 'PENDING'] },
+    });
+
+    // Unique students only
+    const seen = new Set<string>();
+    const targets = regs.filter((r: any) => {
+      const key = String(r.studentId || r.studentEmail).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    if (targets.length === 0) {
+      res.status(400).json({ success: false, message: 'No registered students found for this event yet.' });
+      return;
+    }
+
+    const docs = targets.map((r: any) => ({
+      userId: String(r.studentId),
+      targetRole: 'event',
+      title: title.trim(),
+      message: `${message.trim()}\n\n— ${event.eventName} • Coordinator: ${req.user?.name || ''}`,
+      type: type || 'info',
+      read: false,
+      senderName: req.user?.name || 'Event Coordinator',
+      senderRole: 'coordinator',
+      senderEmail: (req.user as AuthUser)?.email,
+    }));
+
+    await Notification.insertMany(docs);
+
+    res.status(201).json({
+      success: true,
+      message: `Announcement sent to ${targets.length} registered student(s) of ${event.eventName}.`,
+      count: targets.length,
+      eventName: event.eventName,
+    });
+  } catch (error: any) {
+    console.error('[Coordinator Announcement Error]', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to send announcement.' });
+  }
+}
+
+// GET /api/coordinator/events/:id/recipient-count
+// Active (CONFIRMED/PENDING) unique registrants of one owned event.
+export async function getEventRecipientCount(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Not authenticated.' });
+      return;
+    }
+    const { id: eventId } = req.params;
+    let event: any = null;
+    if (String(eventId).match(/^[0-9a-fA-F]{24}$/)) {
+      event = await Event.findById(eventId);
+    }
+    if (!event) {
+      event = await Event.findOne({ customId: eventId });
+    }
+    if (!event) {
+      res.status(404).json({ success: false, message: 'Event not found.' });
+      return;
+    }
+
+    const roles = (req.user as AuthUser)?.roles || [];
+    const isAdmin = roles.includes('admin');
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const ownsEvent =
+      String(event.coordinator || '') === String(req.user._id) ||
+      (event.coordinatorEmail || '').toLowerCase().trim() === userEmail;
+    if (!ownsEvent && !isAdmin) {
+      res.status(403).json({ success: false, message: 'Not your event.' });
+      return;
+    }
+
+    const { Registration } = await import('../models/Registration');
+    const regs = await Registration.find({
+      $or: [
+        { event: event._id },
+        { eventId: event._id.toString() },
+        ...(event.customId ? [{ eventId: event.customId }] : []),
+      ],
+      registrationStatus: { $in: ['CONFIRMED', 'PENDING'] },
+    });
+    const unique = new Set(regs.map((r: any) => String(r.studentId || r.studentEmail).toLowerCase()));
+
+    res.status(200).json({ success: true, count: unique.size, eventName: event.eventName });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || 'Error fetching recipient count.' });
+  }
+}
+
+// GET /api/coordinator/announcements
+// History of event announcements sent by this coordinator.
+export async function getMyEventAnnouncements(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Not authenticated.' });
+      return;
+    }
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const announcements = await Notification.find({
+      senderRole: 'coordinator',
+      senderEmail: userEmail,
+      targetRole: 'event',
+    })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.status(200).json({ success: true, count: announcements.length, announcements });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || 'Error fetching announcements.' });
   }
 }

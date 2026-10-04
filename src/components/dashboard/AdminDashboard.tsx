@@ -13,9 +13,7 @@ import {
   Ticket, 
   Building2, 
   FileText, 
-  BarChart3, 
   User as UserIcon, 
-  Settings, 
   LogOut, 
   Search, 
   Filter, 
@@ -70,15 +68,14 @@ type AdminTab =
   | 'users'
   | 'students'
   | 'coordinators'
+  | 'announcements'
   | 'events'
   | 'departments'
   | 'registrations'
   | 'food-tokens'
   | 'colleges'
   | 'reports'
-  | 'analytics'
-  | 'profile'
-  | 'settings';
+  | 'profile';
 
 
 // Future default registration deadline (+30 days) so events are never created as closed.
@@ -882,18 +879,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => { SoundEngine.playClick(); setActiveTab('analytics'); }}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-tech font-bold uppercase tracking-wider transition-all cursor-pointer ${
-              activeTab === 'analytics'
-                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Analytics</span>
-          </button>
-
-          <button
             onClick={() => { SoundEngine.playClick(); setActiveTab('profile'); }}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-tech font-bold uppercase tracking-wider transition-all cursor-pointer ${
               activeTab === 'profile'
@@ -903,18 +888,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <UserIcon className="w-4 h-4" />
             <span>Profile</span>
-          </button>
-
-          <button
-            onClick={() => { SoundEngine.playClick(); setActiveTab('settings'); }}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-tech font-bold uppercase tracking-wider transition-all cursor-pointer ${
-              activeTab === 'settings'
-                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            <span>Settings</span>
           </button>
         </nav>
 
@@ -1946,7 +1919,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-                Departmental Arenas Overview (9 Branches)
+                Departmental Arenas Overview (10 Branches)
               </h2>
               <p className="text-xs sm:text-sm text-slate-300">
                 Department themes, assigned coordinators, events count, and prize vault allocations.
@@ -2558,8 +2531,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* TAB 9: REPORTS & TAB 10: ANALYTICS */}
-        {(activeTab === 'reports' || activeTab === 'analytics') && analytics && (
+        {/* TAB 9: REPORTS */}
+        {activeTab === 'reports' && analytics && (
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
@@ -2598,8 +2571,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
         )}
 
-        {/* TAB 11: PROFILE & TAB 12: SETTINGS */}
-        {(activeTab === 'profile' || activeTab === 'settings') && (
+        {/* TAB 11: PROFILE */}
+        {activeTab === 'profile' && (
           <div className="max-w-3xl space-y-6">
             <div>
               <h2 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">

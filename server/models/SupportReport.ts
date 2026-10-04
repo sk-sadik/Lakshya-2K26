@@ -4,7 +4,7 @@ export interface ISupportReport extends Document {
   senderId: string;
   senderName: string;
   senderEmail: string;
-  senderRole: 'student' | 'coordinator';
+  senderRole: 'student' | 'coordinator' | 'admin';
   senderPhone?: string;
   senderCollege?: string;
   senderDepartment?: string;
@@ -36,7 +36,7 @@ const SupportReportSchema = new Schema<ISupportReport>(
     },
     senderRole: {
       type: String,
-      enum: ['student', 'coordinator'],
+      enum: ['student', 'coordinator', 'admin'],
       required: true,
     },
     senderPhone: String,

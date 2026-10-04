@@ -449,9 +449,9 @@ export const ThreeHeroCore: React.FC<ThreeHeroCoreProps> = ({ onExploreEvents, o
           National Level Technical & Cultural Symposium
         </p>
 
-        {/* 18 demo events across 9 departments, autonomous robotic arenas, ₹5,00,000+ prize vault, and grand starlight DJ night. */}
+        {/* 18 demo events across 10 departments, autonomous robotic arenas, ₹5,00,000+ prize vault, and grand starlight DJ night. */}
         <p className="text-base sm:text-xl md:text-2xl text-slate-200 max-w-4xl mx-auto font-medium leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] mb-8 select-none">
-          18 featured events across 9 departments, autonomous robotic arenas, ₹5,00,000+ prize vault, and grand valedictory.
+          18 featured events across 10 departments, autonomous robotic arenas, ₹5,00,000+ prize vault, and grand valedictory.
         </p>
 
         {/* Rotation Hint Indicator */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, ManagedEvent, Registration, DepartmentId, EventCategory, UserRole, FoodCoupon } from '../../types';
+import { User, ManagedEvent, Registration, DepartmentId, EventCategory, UserRole, FoodCoupon, NotificationItem, SupportReport } from '../../types';
 import { dbService } from '../../services/dbService';
 import { DEPARTMENTS } from '../../data/lakshyaData';
 import { SoundEngine } from '../AudioEngine';
@@ -31,7 +31,9 @@ import {
   QrCode,
   Utensils,
   MailCheck,
-  RefreshCw
+  RefreshCw,
+  MessageSquare,
+  Bell
 } from 'lucide-react';
 
 import { 
@@ -47,6 +49,7 @@ import {
   Legend 
 } from 'recharts';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
+import { CoordinatorMessagesSection } from './CoordinatorMessagesSection';
 
 interface CoordinatorDashboardProps {
   user: Omit<User, 'passwordHash'>;
@@ -65,6 +68,7 @@ type CoordTab =
   | 'participants'
   | 'food-coupons'
   | 'statistics'
+  | 'messages'
   | 'profile';
 
 
@@ -142,6 +146,10 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
   const [emailAllEventId, setEmailAllEventId] = useState<string>('all');
   const [isEmailingAllCoupons, setIsEmailingAllCoupons] = useState(false);
 
+  // Notifications & Reports (admin -> coordinators only)
+  const [coordNotifications, setCoordNotifications] = useState<NotificationItem[]>([]);
+  const [coordReports, setCoordReports] = useState<SupportReport[]>([]);
+
   // Load data
   const loadData = async () => {
     const stats = dbService.getCoordinatorAnalytics(user.id, user.email);
@@ -155,7 +163,37 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
     } catch {
       // fallback
     }
+
+    // Load coordinator-targeted admin notifications + own reports
+    try {
+      const notifs = await dbService.getNotifications(user.id, 'coordinator');
+      setCoordNotifications(notifs);
+    } catch {
+      // fallback
+    }
+    try {
+      const allReports = await dbService.getReports();
+      setCoordReports(allReports);
+    } catch {
+      // fallback
+    }
   };
+
+  const refreshMessages = async () => {
+    try {
+      const notifs = await dbService.getNotifications(user.id, 'coordinator');
+      setCoordNotifications(notifs);
+    } catch {}
+    try {
+      const allReports = await dbService.getReports();
+      setCoordReports(allReports);
+    } catch {}
+  };
+
+  // Unread admin notices targeted ONLY to coordinators (coordinator + system-wide)
+  const coordUnreadNotices = useMemo(() => coordNotifications.filter(
+    (n) => n.targetRole === 'coordinator' || (n as any).userId === 'coordinators' || n.targetRole === 'all' || (n as any).userId === 'all'
+  ), [coordNotifications]);
 
   useEffect(() => {
     loadData();
@@ -579,6 +617,26 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
           >
             <BarChart3 className="w-4 h-4" />
             <span>Event Statistics</span>
+          </button>
+
+          <button
+            onClick={() => { SoundEngine.playClick(); setActiveTab('messages'); }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-tech font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'messages'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <MessageSquare className="w-4 h-4" />
+              <span>Notifications</span>
+            </div>
+            {coordUnreadNotices.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono text-[10px] font-bold border border-cyan-500/40 flex items-center gap-1">
+                <Bell className="w-3 h-3" />
+                {coordUnreadNotices.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -1858,6 +1916,17 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
           </div>
         )}
 
+        {/* TAB: NOTIFICATIONS (admin -> coordinators only) */}
+        {activeTab === 'messages' && (
+          <CoordinatorMessagesSection
+            currentUser={user}
+            notifications={coordNotifications}
+            reports={coordReports}
+            onRefresh={refreshMessages}
+            showToast={showToast}
+          />
+        )}
+
         {/* TAB 7: PROFILE */}
 
         {activeTab === 'profile' && (
@@ -2066,11 +2135,12 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                 <div>Registration Token: <span className="text-cyan-400 font-bold">{viewParticipant.id}</span></div>
                 <div>Email: <span className="text-white">{viewParticipant.studentEmail}</span></div>
                 <div>Phone: <span className="text-white">{viewParticipant.studentPhone || 'N/A'}</span></div>
+                <div>Roll No: <span className="text-cyan-300 font-bold">{(viewParticipant as any).studentRollNo || 'N/A'}</span></div>
                 <div>College: <span className="text-white">{viewParticipant.college}</span></div>
                 <div>Department: <span className="text-purple-300 uppercase">{viewParticipant.department}</span></div>
                 <div>Event Enrolled: <span className="text-pink-400 font-bold">{viewParticipant.eventName}</span></div>
                 {viewParticipant.teamMembers && (
-                  <div>Team: <span className="text-slate-300">{viewParticipant.teamMembers}</span></div>
+                  <div>Team Members + Roll Nos: <span className="text-slate-300">{viewParticipant.teamMembers}</span></div>
                 )}
                 <div>Status: <span className="text-emerald-400 font-bold uppercase">{viewParticipant.status}</span></div>
               </div>

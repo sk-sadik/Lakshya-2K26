@@ -214,6 +214,25 @@ export async function updateUserAdmin(req: AuthenticatedRequest, res: Response):
 export async function deleteUserAdmin(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const { id } = req.params;
+    const primaryAdmins = ['sksadik45264@gmail.com', 'admin@lbrce.ac.in'];
+
+    const target = await User.findById(id);
+    if (!target) {
+      res.status(404).json({ success: false, message: 'User not found.' });
+      return;
+    }
+
+    const targetEmail = (target.email || '').toLowerCase();
+    const roles = Array.isArray(target.roles) ? target.roles.map(String) : [target.role].filter(Boolean);
+    if (targetEmail === req.user?.email?.toLowerCase()) {
+      res.status(400).json({ success: false, message: 'You cannot delete your own account.' });
+      return;
+    }
+    if (primaryAdmins.includes(targetEmail) || roles.includes('admin')) {
+      res.status(400).json({ success: false, message: 'Cannot delete admin accounts. Remove admin access first or keep the account.' });
+      return;
+    }
+
     await User.findByIdAndDelete(id);
     res.status(200).json({ success: true, message: 'User removed.' });
   } catch (error: any) {

@@ -25,6 +25,7 @@ export async function registerForEvent(req: AuthenticatedRequest, res: Response)
       studentName,
       studentEmail,
       studentPhone,
+      studentRollNo,
       college,
       department,
       teamMembers,
@@ -111,6 +112,7 @@ export async function registerForEvent(req: AuthenticatedRequest, res: Response)
     const regStudentName = studentName || studentUser.name;
     const regStudentEmail = (studentEmail || studentUser.email).toLowerCase().trim();
     const regStudentPhone = studentPhone || studentUser.phone || '';
+    const regStudentRollNo = (studentRollNo || (studentUser as any).rollNo || '').toString().trim().toUpperCase();
     const regCollege = college || studentUser.college;
     const regDepartment = department || studentUser.department;
 
@@ -143,6 +145,7 @@ export async function registerForEvent(req: AuthenticatedRequest, res: Response)
           studentName: regStudentName,
           studentEmail: regStudentEmail,
           studentPhone: regStudentPhone,
+          studentRollNo: regStudentRollNo,
           event: event._id,
           eventId: event._id.toString(),
           eventName: event.eventName,
@@ -204,6 +207,7 @@ export async function registerForEvent(req: AuthenticatedRequest, res: Response)
         studentName: regStudentName,
         studentEmail: regStudentEmail,
         studentPhone: regStudentPhone,
+        studentRollNo: regStudentRollNo,
         event: event._id,
         eventId: event._id.toString(),
         eventName: event.eventName,

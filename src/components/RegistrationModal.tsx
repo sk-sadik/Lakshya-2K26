@@ -47,9 +47,14 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [fullName, setFullName] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
+  const [rollNo, setRollNo] = useState((currentUser as any)?.rollNo || '');
   const [college, setCollege] = useState(currentUser?.college || 'Lakireddy Bali Reddy College of Engineering (Autonomous)');
   const [branch, setBranch] = useState(currentUser?.department?.toUpperCase() || 'CSE');
-  const [teamMembers, setTeamMembers] = useState('');
+  const [teamRows, setTeamRows] = useState<{ name: string; rollNo: string }[]>([
+    { name: '', rollNo: '' },
+    { name: '', rollNo: '' },
+    { name: '', rollNo: '' },
+  ]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [regId, setRegId] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -79,14 +84,48 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const activeEvent = availableEvents.find((e) => e.id === selectedEventId) || initialEvent || availableEvents[0];
   const isFreeEvent = !activeEvent?.entryFee || activeEvent.entryFee.toLowerCase().includes('free') || activeEvent.entryFee === '0';
 
+  // Max team size parsed from teamSize label (e.g. "2 - 4 Members" -> 4). Defaults to 4 extra-capable.
+  const getMaxTeamSize = (): number => {
+    const label = activeEvent?.teamSize || '';
+    const nums = label.match(/\d+/g)?.map(Number) || [];
+    if (nums.length === 0) return 4;
+    return Math.min(Math.max(...nums), 6);
+  };
+  const maxTeamSize = getMaxTeamSize();
+  const isTeamEvent = maxTeamSize > 1 && activeEvent?.teamSize !== 'Individual (1)';
+  const extraSlots = isTeamEvent ? Math.min(maxTeamSize - 1, 5) : 0;
+
+  const updateTeamRow = (idx: number, field: 'name' | 'rollNo', value: string) => {
+    setTeamRows((prev) => prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
 
-    if (!fullName || !email || !phone || !college) {
-      setValidationError('Please fill in all required registration fields.');
+    if (!fullName || !email || !phone || !college || !rollNo.trim()) {
+      setValidationError('Please fill in all required registration fields including your Roll No.');
       return;
     }
+
+    // Validate team member rows: if one half is filled, the other half is required
+    if (isTeamEvent) {
+      for (let i = 0; i < extraSlots; i++) {
+        const row = teamRows[i];
+        if (!row) continue;
+        const hasName = row.name.trim().length > 0;
+        const hasRoll = row.rollNo.trim().length > 0;
+        if ((hasName && !hasRoll) || (!hasName && hasRoll)) {
+          setValidationError(`Team Member ${i + 2}: both Name and Roll No are required together (or leave both empty).`);
+          return;
+        }
+      }
+    }
+
+    const filledTeam = isTeamEvent
+      ? teamRows.slice(0, extraSlots).filter((r) => r.name.trim() && r.rollNo.trim())
+      : [];
+    const teamMembersStr = filledTeam.map((r) => `${r.name.trim()} (${r.rollNo.trim().toUpperCase()})`).join(', ') || undefined;
 
     const targetEventId = activeEvent?.id || 'cse-1';
 
@@ -98,9 +137,10 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         studentName: fullName,
         studentEmail: email,
         studentPhone: phone,
+        studentRollNo: rollNo.trim().toUpperCase(),
         college: college,
         department: branch.toLowerCase(),
-        teamMembers: teamMembers.trim() || undefined,
+        teamMembers: teamMembersStr,
       });
 
       if (!res.isPaid || !res.paymentOrder) {
@@ -362,18 +402,32 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-400 mb-1">
+                  College / Institute *
+                </label>
+                <input
+                  required
+                  type="text"
+                  value={college}
+                  onChange={(e) => setCollege(e.target.value)}
+                  placeholder="e.g. LBRCE, JNTUK, VRSEC, VIT"
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-purple-900/60 text-white text-sm focus:outline-none focus:border-pink-500"
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-400 mb-1">
-                    College / Institute *
+                    Your Roll No *
                   </label>
                   <input
                     required
                     type="text"
-                    value={college}
-                    onChange={(e) => setCollege(e.target.value)}
-                    placeholder="e.g. LBRCE, JNTUK, VRSEC, VIT"
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-purple-900/60 text-white text-sm focus:outline-none focus:border-pink-500"
+                    value={rollNo}
+                    onChange={(e) => setRollNo(e.target.value.toUpperCase())}
+                    placeholder="e.g. 23761A05A1"
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-purple-900/60 text-white text-sm focus:outline-none focus:border-pink-500 font-mono uppercase"
                   />
                 </div>
                 <div>
@@ -394,22 +448,42 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     <option value="MECH">Mechanical Engineering</option>
                     <option value="CIVIL">Civil Engineering</option>
                     <option value="AERO">Aerospace Engineering</option>
+                    <option value="MBA">MBA (Management Studies)</option>
                   </select>
                 </div>
               </div>
 
-              {activeEvent && activeEvent.teamSize !== 'Individual (1)' && (
-                <div>
-                  <label className="block text-xs font-mono uppercase text-slate-400 mb-1">
-                    Team Members & Roll Nos (Optional)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={teamMembers}
-                    onChange={(e) => setTeamMembers(e.target.value)}
-                    placeholder="Member 2: Name & Roll No&#10;Member 3: Name & Roll No"
-                    className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-purple-900/60 text-white text-xs focus:outline-none focus:border-pink-500 font-mono"
-                  />
+              {isTeamEvent && (
+                <div className="p-4 rounded-xl bg-slate-950/60 border border-purple-900/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-mono uppercase text-slate-300 font-bold">
+                      Other Team Members + Roll Nos
+                    </label>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      Team size: {activeEvent?.teamSize} • You are Member 1
+                    </span>
+                  </div>
+                  {teamRows.slice(0, extraSlots).map((row, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => updateTeamRow(idx, 'name', e.target.value)}
+                        placeholder={`Member ${idx + 2} Name`}
+                        className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-purple-900/60 text-white text-xs focus:outline-none focus:border-pink-500"
+                      />
+                      <input
+                        type="text"
+                        value={row.rollNo}
+                        onChange={(e) => updateTeamRow(idx, 'rollNo', e.target.value.toUpperCase())}
+                        placeholder={`Member ${idx + 2} Roll No`}
+                        className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-purple-900/60 text-white text-xs focus:outline-none focus:border-pink-500 font-mono uppercase"
+                      />
+                    </div>
+                  ))}
+                  <p className="text-[10px] font-mono text-slate-500">
+                    Leave unused rows empty. Both Name & Roll No are required together for each added member.
+                  </p>
                 </div>
               )}
             </div>
@@ -475,8 +549,13 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 {regId}
               </span>
               <span className="text-[11px] text-slate-300 block mt-2 border-t border-purple-900/40 pt-2">
-                {fullName} • {branch}
+                {fullName} • {rollNo.toUpperCase()} • {branch}
               </span>
+              {teamRows.slice(0, extraSlots).some((r) => r.name.trim() && r.rollNo.trim()) && (
+                <span className="text-[11px] text-purple-300 font-mono block mt-1">
+                  Team: {teamRows.slice(0, extraSlots).filter((r) => r.name.trim() && r.rollNo.trim()).map((r) => `${r.name.trim()} (${r.rollNo.trim().toUpperCase()})`).join(', ')}
+                </span>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-4">

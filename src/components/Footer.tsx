@@ -63,13 +63,20 @@ export const Footer: React.FC = () => {
           {/* Col 2: Institutional Leadership & Patronage */}
           <div className="md:col-span-4 space-y-3">
             <h4 className="text-xs font-mono uppercase tracking-widest text-slate-300 font-bold">
-              Organizing Leadership
+              Founder & Trust Management
             </h4>
             <div className="space-y-2 text-xs text-slate-300 font-sans">
-              <p><strong className="text-white">Chief Patron:</strong> Er. Lakireddy Bali Reddy (Founder Chairman)</p>
-              <p><strong className="text-white">Patron:</strong> Sri L. Jaya Prakash Reddy (Co-Chairman)</p>
-              <p><strong className="text-white">Chairman:</strong> Dr. K. Appa Rao (Principal, LBRCE)</p>
-              <p><strong className="text-white">Convener:</strong> Dr. Ch. Venkata Narayana (Professor & Dean)</p>
+              <p><strong className="text-white">Founder Chairman:</strong> Late Sri Lakireddy Bali Reddy</p>
+              <p><strong className="text-white">Chairman:</strong> Sri Lakireddy Prasad Reddy</p>
+              <p><strong className="text-white">Co-Founder & Honorary Chairman:</strong> Sri Lakireddy Jayaprakash Reddy</p>
+              <p><strong className="text-white">President (LBRCE):</strong> Sri G. Srinivasa Reddy</p>
+            </div>
+            <h4 className="text-xs font-mono uppercase tracking-widest text-slate-300 font-bold pt-2">
+              College Executive Leadership
+            </h4>
+            <div className="space-y-2 text-xs text-slate-300 font-sans">
+              <p><strong className="text-white">Principal:</strong> Dr. K. Appa Rao</p>
+              <p><strong className="text-white">Vice-Principal:</strong> Dr. B. Ramesh Reddy</p>
               <p><strong className="text-white">Student Core:</strong> All-Department Technical Associations & IEEE/CSI/ISTE Chapters</p>
             </div>
           </div>
@@ -117,7 +124,7 @@ export const Footer: React.FC = () => {
           <div className="flex items-center gap-2">
             <span>Crafted for Lakshya 2026 with</span>
             <Heart className="w-3.5 h-3.5 text-pink-500 fill-pink-500" />
-            <span className="text-purple-300/80">by LBRCE Student Developers</span>
+            <span className="text-purple-300/80">by Brights of F-Section</span>
           </div>
         </div>
       </div>

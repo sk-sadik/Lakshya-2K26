@@ -3,7 +3,7 @@ import { DepartmentInfo, EventItem, ScheduleItem, CampusSpot } from '../types';
 export const FEST_METRICS = {
   prizePool: '₹5,00,000+',
   eventsCount: '18 Events',
-  departmentsCount: '9 Branches',
+  departmentsCount: '10 Branches',
   expectedFootfall: '12,000+',
   days: '1 Day National Fest',
   edition: 'Annual National Symposium',
@@ -110,6 +110,17 @@ export const DEPARTMENTS: DepartmentInfo[] = [
     iconName: 'Send',
     accentColor: '#38bdf8', // Electric Sky Blue
     badge: 'Aero Vanguard',
+    totalPrizes: '₹50,000'
+  },
+  {
+    id: 'mba',
+    name: 'Master of Business Administration (MBA)',
+    code: 'MBA-STRATEGY',
+    theme: 'Business Strategy & Management Innovation',
+    description: 'Case-study showdowns, B-plan battles, marketing meltdowns, HR strategy sprints, and finance management challenges.',
+    iconName: 'TrendingUp',
+    accentColor: '#f59e0b', // Amber Gold
+    badge: 'Management',
     totalPrizes: '₹50,000'
   }
 ];
