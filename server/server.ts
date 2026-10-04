@@ -3,6 +3,9 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { connectDB } from './config/db';
 import { seedDatabase } from './seed/seedData';
 
@@ -55,10 +58,21 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/coordinator', coordinatorRoutes);
 app.use('/api/coupons', couponRoutes);
 
-// 404 handler
-app.use((_req, res) => {
+// 404 handler for unknown API routes only (frontend routes fall through to the SPA fallback below)
+app.use('/api', (_req, res) => {
   res.status(404).json({ success: false, message: 'API endpoint not found.' });
 });
+
+// Serve the production frontend build (created by `npm run build` -> dist/).
+// Local dev is unaffected: dist/ usually doesn't exist when running `npm run dev`.
+const serverDir = path.dirname(fileURLToPath(import.meta.url));
+const distDir = path.resolve(serverDir, '..', 'dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

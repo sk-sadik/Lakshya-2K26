@@ -1,0 +1,37 @@
+# Render Blueprint for Lakshya 2026 (single Web Service: Express API + Vite frontend build).
+# Usage: Render Dashboard -> New -> Blueprint -> select the Lakshya-2K26 repo.
+# Then fill the sync:false (secret) env vars below in the dashboard.
+services:
+  - type: web
+    name: lakshya-2026
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        value: https://lakshya-2026.onrender.com
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: 587
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        value: LBRCE Lakshya 2026 <sksadik45264@gmail.com>
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
