@@ -1,0 +1,158 @@
+{
+  "info": {
+    "name": "Lakshya 2026 Website API",
+    "description": "Generated from the Lakshya-2K26 repo. Set baseUrl and jwt variables before running authenticated calls.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://lakshya2k26.onrender.com" },
+    { "key": "jwt", "value": "PASTE_JWT_HERE" },
+    { "key": "eventId", "value": "cse-1" },
+    { "key": "registrationId", "value": "PASTE_REGISTRATION_ID" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Test Student\",\"email\":\"test@college.edu\",\"password\":\"test1234\",\"college\":\"LBRCE (Autonomous)\",\"department\":\"cse\",\"phone\":\"+919876543210\",\"rollNo\":\"23761A0001\"}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"test@college.edu\",\"password\":\"test1234\"}" }
+          }
+        },
+        {
+          "name": "Verify email OTP",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/verify-email",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"test@college.edu\",\"otp\":\"123456\"}" }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "List events",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/events?department=cse&status=upcoming"
+          }
+        },
+        {
+          "name": "Event details",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/events/{{eventId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Registration + Payment",
+      "item": [
+        {
+          "name": "Create registration",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/events/{{eventId}}/register",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"studentName\":\"Test Student\",\"studentEmail\":\"test@college.edu\",\"studentPhone\":\"+919876543210\",\"studentRollNo\":\"23761A0001\",\"college\":\"LBRCE (Autonomous)\",\"department\":\"cse\",\"teamMembers\":\"Second Member (23761A0002)\"}"
+            }
+          }
+        },
+        {
+          "name": "My registrations",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/registrations/my",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }]
+          }
+        },
+        {
+          "name": "Registration by id",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/registrations/{{registrationId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }]
+          }
+        },
+        {
+          "name": "Verify payment",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/payment/verify",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"registrationId\":\"{{registrationId}}\",\"razorpay_order_id\":\"order_test\",\"razorpay_payment_id\":\"pay_test\",\"razorpay_signature\":\"sig_test\"}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Coupons + Announcements",
+      "item": [
+        {
+          "name": "My food passes",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/coupons/my",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }]
+          }
+        },
+        {
+          "name": "My notifications (role=student|coordinator)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/admin/notifications?role=coordinator",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/health" }
+        }
+      ]
+    }
+  ]
+}
