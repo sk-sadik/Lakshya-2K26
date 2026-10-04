@@ -88,6 +88,21 @@ async function startServer() {
   await connectDB();
   await seedDatabase();
 
+  // Verify SMTP relay reachability at boot so Render logs show
+  // immediately whether OTP emails can go out (no secrets logged).
+  try {
+    const { createTransporter } = await import('./services/emailService');
+    const transporter = createTransporter();
+    if (!transporter) {
+      console.error('[EmailService] SMTP credentials missing — OTP emails will fail.');
+    } else {
+      await transporter.verify();
+      console.log('[EmailService] SMTP relay verified — OTP emails can be sent.');
+    }
+  } catch (err: any) {
+    console.error('[EmailService] SMTP relay verification FAILED:', err?.message || err);
+  }
+
   const server = app.listen(PORT, () => {
     console.log(`🚀 [Server] Lakshya 2026 Backend running on http://localhost:${PORT}`);
   });
