@@ -228,6 +228,9 @@ export interface FoodCoupon {
   eventId?: string;
   eventName?: string;
   issuedBy?: string;
+  issuedByEmail?: string;
+  emailed?: boolean;
+  emailedAt?: string;
   mealType: string;
   mealDescription: string;
   venue: string;

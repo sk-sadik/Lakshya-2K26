@@ -17,7 +17,7 @@ export async function generateRegistrationQR(registrationId: string, eventId: st
 
   // Structured verification payload for turnstile scanners
   const qrContent = JSON.stringify({
-    sys: 'LAKSHYA-2026',
+    sys: 'LAKSHYA-2027',
     token,
     regId: registrationId,
     evtId: eventId,

@@ -7,23 +7,23 @@ import { Coordinator, ICoordinator } from '../models/Coordinator';
 import { OTP } from '../models/OTP';
 import { sendOTPEmailInBackground } from '../services/emailService';
 import { AuthenticatedRequest, AuthUser } from '../middleware/auth';
+import { getJwtSecret } from '../config/env';
 
 function hashOTP(otp: string): string {
   return crypto.createHash('sha256').update(`lakshya_otp_${otp}`).digest('hex');
 }
 
 function generateToken(user: AuthUser): string {
-  const secret = process.env.JWT_SECRET || 'lakshya_jwt_secure_secret_hash_production_2026';
   const userRoles = Array.isArray((user as any).roles) ? (user as any).roles : [(user as any).role];
-  
+
   return jwt.sign(
     {
       id: user._id,
       email: user.email,
       roles: userRoles,
     },
-    secret,
-    { expiresIn: '7d' }
+    getJwtSecret(),
+    { expiresIn: '7d', algorithm: 'HS256' }
   );
 }
 

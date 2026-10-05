@@ -13,18 +13,19 @@ import {
   verifyOTP,
 } from '../controllers/authController';
 import { protect } from '../middleware/auth';
+import { authLimiter, otpSendLimiter, otpVerifyLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
-router.post('/register', register);
-router.post('/verify-email', verifyEmail);
-router.post('/send-otp', sendOTP);
-router.post('/verify-otp', verifyOTP);
-router.post('/resend-otp', resendOTP);
-router.post('/login', login);
-router.post('/forgot-password', forgotPassword);
-router.post('/verify-reset-otp', verifyResetOTP);
-router.post('/reset-password', resetPassword);
+router.post('/register', authLimiter, register);
+router.post('/verify-email', otpVerifyLimiter, verifyEmail);
+router.post('/send-otp', otpSendLimiter, sendOTP);
+router.post('/verify-otp', otpVerifyLimiter, verifyOTP);
+router.post('/resend-otp', otpSendLimiter, resendOTP);
+router.post('/login', authLimiter, login);
+router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/verify-reset-otp', otpVerifyLimiter, verifyResetOTP);
+router.post('/reset-password', authLimiter, resetPassword);
 router.post('/change-password', protect, changePassword);
 router.get('/me', protect, getMe);
 

@@ -1,7 +1,7 @@
-# Lakshya 2026 — Website API: confirmed behaviour (for integration review)
+# Lakshya 2027 — Website API: confirmed behaviour (for integration review)
 
 This document answers the integration questionnaire field-by-field against the
-actual codebase (`https://github.com/sk-sadik/Lakshya-2K26`, branch `main`).
+actual codebase (`https://github.com/sk-sadik/Lakshya-2K27`, branch `main`).
 Each item is marked **EXISTS** (works today, code-referenced), **MISSING**
 (does not exist), or **CAN ADD** (small, well-scoped work). Please mark anything
 you read differently.
@@ -10,7 +10,7 @@ you read differently.
 > the repo (`.env` is gitignored). Staging credentials, if created, will be
 > shared separately and directly.
 
-Base URL (production): `https://lakshya2k26.onrender.com` (API and frontend are
+Base URL (production): `https://lakshya2K27.onrender.com` (API and frontend are
 served same-origin from one Render web service).
 Local dev: frontend `http://localhost:3000`, backend `http://localhost:5000`
 (Vite proxies `/api` → `:5000`).
@@ -21,7 +21,7 @@ Local dev: frontend `http://localhost:3000`, backend `http://localhost:5000`
 
 - Backend: **Node.js + Express 4 + TypeScript** (run via `tsx`), JWT auth
   (`jsonwebtoken` + `bcryptjs`), MongoDB via Mongoose.
-- Database: **MongoDB Atlas** (`lakshya2026` database), pool `maxPoolSize: 100`,
+- Database: **MongoDB Atlas** (`lakshya2027` database), pool `maxPoolSize: 100`,
   `minPoolSize: 10` (`server/config/db.ts`).
 - Hosting: **single Render web service** — Express serves both `/api/*` and the
   Vite production build (`server/server.ts` static + SPA fallback).
@@ -75,7 +75,7 @@ Conventions: JSON everywhere. Success: `{ success: true, ... }`. Errors:
       "department": "cse",
       "category": "coding",
       "venue": "CSE Lab 3",
-      "date": "2026-03-20",
+      "date": "2027-03-20",
       "time": "10:00 AM - 01:00 PM",
       "entryFee": "₹150 / Team",
       "registrationFee": "₹150 / Team",
@@ -83,7 +83,7 @@ Conventions: JSON everywhere. Success: `{ success: true, ... }`. Errors:
       "isPaid": true,
       "maxParticipants": 80,
       "registeredCount": 12,
-      "registrationDeadline": "2026-03-18 11:59 PM",
+      "registrationDeadline": "2027-03-18 11:59 PM",
       "teamSize": "2 - 4 Members",
       "prizes": { "first": "₹10,000", "second": "₹5,000" },
       "status": "upcoming",

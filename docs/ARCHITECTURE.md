@@ -1,9 +1,9 @@
-# Lakshya 2026 — Product Architecture
+# Lakshya 2027 — Product Architecture
 
-**Product:** Official web portal for *Lakshya 2026*, the national-level technical
+**Product:** Official web portal for *Lakshya 2027*, the national-level technical
 symposium of Lakireddy Bali Reddy College of Engineering (Autonomous), Mylavaram.
-**Repo:** `https://github.com/sk-sadik/Lakshya-2K26` (`main`)
-**Live URL:** `https://lakshya2k26.onrender.com`
+**Repo:** `https://github.com/sk-sadik/Lakshya-2K27` (`main`)
+**Live URL:** `https://lakshya2K27.onrender.com`
 **Audience:** students/participants, event coordinators, fest administrators.
 
 ---
@@ -39,7 +39,7 @@ symposium of Lakireddy Bali Reddy College of Engineering (Autonomous), Mylavaram
                                                        │
               ┌────────────────────────────────────────┼───────────────────────┐
               │                                        ▼                       │
-              │  MongoDB Atlas (lakshya2026)   Razorpay (checkout + webhook)  │
+              │  MongoDB Atlas (lakshya2027)   Razorpay (checkout + webhook)  │
               │  Users · Events · Registrations  Brevo HTTPS API (OTP + food  │
               │  FoodCoupons · Notifications ·   passes; Gmail SMTP fallback) │
               │  SupportReports · OTPs                                        │

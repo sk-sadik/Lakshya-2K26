@@ -4,20 +4,86 @@ import Razorpay from 'razorpay';
 import { Registration } from '../models/Registration';
 import { Event } from '../models/Event';
 import { generateRegistrationQR } from '../services/qrService';
-import { AuthenticatedRequest } from '../middleware/auth';
+import { AuthenticatedRequest, AuthUser } from '../middleware/auth';
+import { getRazorpayConfig } from '../config/env';
 
 function getRazorpayInstance(): Razorpay | null {
-  const key_id = process.env.RAZORPAY_KEY_ID;
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
-
-  if (key_id && key_secret && key_id !== 'rzp_test_your_key_id' && key_secret !== 'your_razorpay_secret_key') {
-    return new Razorpay({
-      key_id,
-      key_secret,
-    });
+  const config = getRazorpayConfig();
+  if (!config) {
+    return null;
   }
-  console.warn('[Razorpay] Using test mode - valid credentials not configured');
-  return null;
+  return new Razorpay({
+    key_id: config.keyId,
+    key_secret: config.keySecret,
+  });
+}
+
+/** True when the caller owns the registration (student) or is an admin. */
+function canAccessRegistration(reg: any, user: AuthUser | undefined): boolean {
+  if (!user) return false;
+  const roles: string[] = Array.isArray((user as any).roles)
+    ? (user as any).roles
+    : [(user as any).role].filter(Boolean);
+  if (roles.includes('admin')) return true;
+  return String(reg.studentId) === String((user as any)._id);
+}
+
+/** True for admin or the coordinator who owns the given event. */
+function canAccessEvent(event: any, user: AuthUser | undefined): boolean {
+  if (!user) return false;
+  const roles: string[] = Array.isArray((user as any).roles)
+    ? (user as any).roles
+    : [(user as any).role].filter(Boolean);
+  if (roles.includes('admin')) return true;
+  const userEmail = ((user as any).email || '').toLowerCase().trim();
+  return (
+    String(event.coordinator || '') === String((user as any)._id) ||
+    (event.coordinatorEmail || '').toLowerCase().trim() === userEmail
+  );
+}
+
+export interface IssuedOrder {
+  id: string;
+  amount: number;
+  currency: string;
+  key: string;
+}
+
+/**
+ * Create a REAL Razorpay order for a registration. Amounts come only from the
+ * server-side event record. Throws { status, message } on any failure —
+ * callers must leave the registration PENDING and surface a safe error.
+ * Never invents order ids.
+ */
+export async function issueRazorpayOrder(reg: any, event: any): Promise<IssuedOrder> {
+  const config = getRazorpayConfig();
+  const razorpay = getRazorpayInstance();
+  if (!config || !razorpay) {
+    console.error('[Razorpay] Order issuance refused: gateway credentials not configured.');
+    throw { status: 500, message: 'Payment gateway is not configured. Please contact support.' };
+  }
+  const amountInPaise = Math.round(event.feeAmount * 100);
+  if (amountInPaise <= 0) {
+    throw { status: 400, message: 'This event has no registration fee.' };
+  }
+  try {
+    const order: any = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: `rcpt_${reg._id.toString().slice(-8)}`,
+      notes: {
+        registrationId: reg._id.toString(),
+        eventId: event._id.toString(),
+        eventName: event.eventName,
+        studentEmail: reg.studentEmail,
+      },
+    });
+    console.log(`[Razorpay] Order created successfully: ${order.id}`);
+    return { id: order.id, amount: amountInPaise, currency: 'INR', key: config.keyId };
+  } catch (err: any) {
+    console.error('[Razorpay API Error]', err?.message || err);
+    throw { status: 502, message: 'Payment gateway is temporarily unavailable. Your registration is still pending — please try again.' };
+  }
 }
 
 // POST /api/payment/create-order
@@ -36,6 +102,13 @@ export async function createPaymentOrder(req: AuthenticatedRequest, res: Respons
       return;
     }
 
+    // Ownership: students may only create orders for their own registrations.
+    // (404 instead of 403 so registration IDs cannot be probed.)
+    if (!canAccessRegistration(reg, req.user)) {
+      res.status(404).json({ success: false, message: 'Registration record not found.' });
+      return;
+    }
+
     if (reg.paymentStatus === 'PAID' && reg.registrationStatus === 'CONFIRMED') {
       res.status(400).json({ success: false, message: 'This registration is already paid and confirmed.' });
       return;
@@ -47,40 +120,46 @@ export async function createPaymentOrder(req: AuthenticatedRequest, res: Respons
       return;
     }
 
+    // Coordinators may only act on events they own (admins bypass).
+    if (!canAccessEvent(event, req.user)) {
+      res.status(404).json({ success: false, message: 'Registration record not found.' });
+      return;
+    }
+
+    // Event must still be payable: approved, open, within deadline, seats left.
+    if (event.approvalStatus !== 'approved' || !['upcoming', 'ongoing'].includes(event.status)) {
+      res.status(400).json({ success: false, message: 'This event is no longer open for payment.' });
+      return;
+    }
+    if (event.registrationDeadline) {
+      const deadline = new Date(event.registrationDeadline);
+      if (!isNaN(deadline.getTime()) && new Date() > deadline) {
+        res.status(400).json({ success: false, message: 'The payment window for this event has closed.' });
+        return;
+      }
+    }
+    if (event.maxParticipants > 0 && event.registeredCount >= event.maxParticipants) {
+      res.status(400).json({ success: false, message: 'Event capacity is full. Registrations are closed.' });
+      return;
+    }
+
+    // Amount ALWAYS comes from the server-side event record, never the client.
     const amountInPaise = Math.round(event.feeAmount * 100);
     if (amountInPaise <= 0) {
       res.status(400).json({ success: false, message: 'This event has no registration fee.' });
       return;
     }
 
-    const razorpay = getRazorpayInstance();
-    let orderId = `order_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-
-    if (razorpay) {
-      try {
-        const order = await razorpay.orders.create({
-          amount: amountInPaise,
-          currency: 'INR',
-          receipt: `rcpt_${reg._id.toString().slice(-8)}`,
-          notes: {
-            registrationId: reg._id.toString(),
-            eventId: event._id.toString(),
-            eventName: event.eventName,
-            studentEmail: reg.studentEmail,
-          },
-        });
-        orderId = order.id;
-        console.log(`[Razorpay] Order created successfully: ${orderId}`);
-      } catch (err: any) {
-        console.error('[Razorpay API Error]', err);
-        // Continue with test order ID if API fails
-        console.warn('[Razorpay] Using test order ID due to API failure');
-      }
-    } else {
-      console.log('[Razorpay] Using test mode - order will be simulated');
+    // Strict issuance: real Razorpay order or a safe error. Never fake order ids.
+    let order: IssuedOrder;
+    try {
+      order = await issueRazorpayOrder(reg, event);
+    } catch (err: any) {
+      res.status(err?.status || 500).json({ success: false, message: err?.message || 'Failed to create payment order.' });
+      return;
     }
 
-    reg.paymentOrderId = orderId;
+    reg.paymentOrderId = order.id;
     reg.paymentAmount = event.feeAmount;
     reg.paymentStatus = 'PENDING';
     await reg.save();
@@ -88,16 +167,15 @@ export async function createPaymentOrder(req: AuthenticatedRequest, res: Respons
     res.status(200).json({
       success: true,
       order: {
-        id: orderId,
-        amount: amountInPaise,
-        currency: 'INR',
-        key: process.env.RAZORPAY_KEY_ID || 'rzp_test_lakshya2026Key',
+        id: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        key: order.key,
         eventName: event.eventName,
         eventFee: event.entryFee,
         studentName: reg.studentName,
         studentEmail: reg.studentEmail,
         studentPhone: reg.studentPhone,
-        testMode: !razorpay,
       },
       registrationId: reg._id.toString(),
     });
@@ -126,6 +204,12 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response): P
       return;
     }
 
+    // Ownership: the registration must belong to the logged-in student (admins bypass).
+    if (!canAccessRegistration(reg, req.user)) {
+      res.status(404).json({ success: false, message: 'Registration record not found.' });
+      return;
+    }
+
     // Idempotent handling for concurrent retries/webhooks
     if (reg.paymentStatus === 'PAID' && reg.registrationStatus === 'CONFIRMED') {
       res.status(200).json({
@@ -138,30 +222,35 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response): P
       return;
     }
 
-    const key_secret = process.env.RAZORPAY_KEY_SECRET || 'rzp_test_secret_lakshya2026Key';
-
-    // Check if we're in test mode (placeholder credentials)
-    const isTestMode = !process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET === 'your_razorpay_secret_key';
-
-    let isSignatureValid = false;
-
-    if (isTestMode) {
-      // In test mode, accept any signature for development
-      console.log('[Razorpay] Test mode: skipping signature verification');
-      isSignatureValid = true;
-    } else {
-      // Official Razorpay HMAC-SHA256 signature verification:
-      // HMAC(order_id + "|" + payment_id, secret)
-      const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-      const expectedSignature = crypto
-        .createHmac('sha256', key_secret)
-        .update(body)
-        .digest('hex');
-
-      const expBuf = Buffer.from(expectedSignature, 'utf8');
-      const actBuf = Buffer.from(razorpay_signature, 'utf8');
-      isSignatureValid = expBuf.length === actBuf.length && crypto.timingSafeEqual(expBuf, actBuf);
+    // Razorpay order ownership: the supplied order must be THIS registration's order.
+    if (!reg.paymentOrderId || razorpay_order_id !== reg.paymentOrderId) {
+      res.status(400).json({
+        success: false,
+        message: 'Payment order does not match this registration. Please create a fresh payment order.',
+      });
+      return;
     }
+
+    // Real credentials are mandatory — arbitrary signatures are never accepted.
+    const razorpayConfig = getRazorpayConfig();
+    const razorpay = getRazorpayInstance();
+    if (!razorpayConfig || !razorpay) {
+      console.error('[Razorpay] Verify refused: gateway credentials not configured.');
+      res.status(500).json({ success: false, message: 'Payment gateway is not configured. Please contact support.' });
+      return;
+    }
+
+    // Official Razorpay HMAC-SHA256 signature verification:
+    // HMAC(order_id + "|" + payment_id, key_secret)
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', razorpayConfig.keySecret)
+      .update(body)
+      .digest('hex');
+
+    const expBuf = Buffer.from(expectedSignature, 'utf8');
+    const actBuf = Buffer.from(String(razorpay_signature), 'utf8');
+    const isSignatureValid = expBuf.length === actBuf.length && crypto.timingSafeEqual(expBuf, actBuf);
 
     if (!isSignatureValid) {
       await Registration.findByIdAndUpdate(registrationId, { paymentStatus: 'FAILED' });
@@ -173,11 +262,65 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response): P
       return;
     }
 
+    // Server-side amount/event validation + Razorpay API cross-check.
+    // Nothing about the amount is trusted from the client.
+    const event = await Event.findById(reg.event);
+    if (!event) {
+      res.status(404).json({ success: false, message: 'Event details not found.' });
+      return;
+    }
+    const expectedPaise = Math.round(event.feeAmount * 100);
+    if (expectedPaise <= 0) {
+      res.status(400).json({ success: false, message: 'This event has no registration fee.' });
+      return;
+    }
+    let rzpOrder: any;
+    let rzpPayment: any;
+    try {
+      rzpOrder = await razorpay.orders.fetch(razorpay_order_id);
+      rzpPayment = await razorpay.payments.fetch(razorpay_payment_id);
+    } catch (err: any) {
+      console.error('[Razorpay API Verify Error]', err?.message || err);
+      res.status(502).json({ success: false, message: 'Could not confirm the payment with the gateway. Please try again.' });
+      return;
+    }
+    if (
+      !rzpOrder || !rzpPayment ||
+      String(rzpOrder.id) !== String(razorpay_order_id) ||
+      String(rzpPayment.order_id) !== String(razorpay_order_id) ||
+      Number(rzpOrder.amount) !== expectedPaise ||
+      Number(rzpPayment.amount) !== expectedPaise ||
+      (rzpOrder.currency || 'INR').toUpperCase() !== 'INR' ||
+      (rzpPayment.currency || 'INR').toUpperCase() !== 'INR' ||
+      rzpPayment.status !== 'captured'
+    ) {
+      await Registration.findByIdAndUpdate(registrationId, { paymentStatus: 'FAILED' });
+      res.status(400).json({
+        success: false,
+        message: 'Payment details do not match this registration (amount, currency, order, or capture status). Registration could not be confirmed.',
+      });
+      return;
+    }
+
+    // Replay guard: this Razorpay payment must not already confirm another registration.
+    const reused = await Registration.findOne({
+      _id: { $ne: reg._id },
+      paymentId: razorpay_payment_id,
+      paymentStatus: 'PAID',
+    });
+    if (reused) {
+      res.status(409).json({
+        success: false,
+        message: 'This payment has already been used for another registration.',
+      });
+      return;
+    }
+
     // Generate unique verifiable delegate QR badge
     const qr = await generateRegistrationQR(reg._id.toString(), reg.eventId, reg.studentId);
 
-    // ATOMIC COMPARE-AND-SWAP:
-    // Guarantees concurrency safety even if 1000 users or webhooks submit simultaneously
+    // ATOMIC COMPARE-AND-SWAP (registration):
+    // Exactly one concurrent execution can move this registration to PAID.
     const updatedReg = await Registration.findOneAndUpdate(
       {
         _id: reg._id,
@@ -189,6 +332,7 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response): P
           paymentOrderId: razorpay_order_id,
           paymentSignature: razorpay_signature,
           paymentStatus: 'PAID',
+          paymentAmount: event.feeAmount,
           registrationStatus: 'CONFIRMED',
           qrToken: qr.token,
           qrCodeDataUrl: qr.dataUrl,
@@ -197,10 +341,34 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response): P
       { new: true }
     );
 
-    if (updatedReg) {
-      // Exactly ONE concurrent execution wins and increments the event count
-      await Event.findByIdAndUpdate(reg.event, { $inc: { registeredCount: 1 } });
+    if (!updatedReg) {
+      // An earlier concurrent call already marked it PAID.
+      const confirmedReg = await Registration.findById(registrationId);
+      res.status(200).json({
+        success: true,
+        message: 'Payment already verified and registration confirmed.',
+        registration: confirmedReg ? confirmedReg.toJSON() : reg.toJSON(),
+        qrToken: confirmedReg?.qrToken || reg.qrToken,
+        qrCodeDataUrl: confirmedReg?.qrCodeDataUrl || reg.qrCodeDataUrl,
+      });
+      return;
+    }
 
+    // ATOMIC CAPACITY CHECK + COUNT (prevents paid-event overselling):
+    // the seat is claimed only if capacity is still available.
+    const capped = event.maxParticipants > 0;
+    const seatClaim = capped
+      ? await Event.findOneAndUpdate(
+          {
+            _id: event._id,
+            $expr: { $lt: ['$registeredCount', '$maxParticipants'] },
+          },
+          { $inc: { registeredCount: 1 } },
+          { new: true }
+        )
+      : await Event.findByIdAndUpdate(event._id, { $inc: { registeredCount: 1 } }, { new: true });
+
+    if (seatClaim) {
       res.status(200).json({
         success: true,
         message: 'Payment verified successfully! Your event registration is confirmed.',
@@ -211,15 +379,22 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response): P
       return;
     }
 
-    // If updatedReg is null, an earlier concurrent call already marked it PAID!
-    const confirmedReg = await Registration.findById(registrationId);
-    res.status(200).json({
-      success: true,
-      message: 'Payment already verified and registration confirmed.',
-      registration: confirmedReg ? confirmedReg.toJSON() : reg.toJSON(),
-      qrToken: confirmedReg?.qrToken || reg.qrToken,
-      qrCodeDataUrl: confirmedReg?.qrCodeDataUrl || reg.qrCodeDataUrl,
-    });
+    // Capacity filled between order and confirmation: do NOT confirm.
+    // Attempt an automatic refund of the captured payment (best effort).
+    let refundNote = 'No seat was available, so this registration was NOT confirmed.';
+    try {
+      const refund = await razorpay.payments.refund(razorpay_payment_id, { amount: expectedPaise });
+      refundNote += ` An automatic refund (${(refund as any)?.id || 'initiated'}) has been started to the original payment method.`;
+      await Registration.findByIdAndUpdate(reg._id, {
+        registrationStatus: 'CANCELLED',
+        paymentStatus: 'CANCELLED',
+      });
+    } catch (refundErr: any) {
+      console.error('[Razorpay Auto-Refund Error]', refundErr?.message || refundErr);
+      refundNote += ' Automatic refund failed — please contact support with payment id ' + razorpay_payment_id + ' for a manual refund.';
+      await Registration.findByIdAndUpdate(reg._id, { registrationStatus: 'CANCELLED' });
+    }
+    res.status(409).json({ success: false, message: `Event capacity just filled. ${refundNote}` });
   } catch (error: any) {
     console.error('[Verify Payment Error]', error);
     res.status(500).json({ success: false, message: error.message || 'Payment verification failed.' });
@@ -227,57 +402,109 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response): P
 }
 
 // POST /api/payment/webhook
+// FAIL-CLOSED: the request is rejected unless the webhook secret is configured,
+// a signature is present and valid (HMAC-SHA256 over the RAW request body),
+// and the payload parses. Only then is anything processed.
 export async function paymentWebhook(req: Request, res: Response): Promise<void> {
   try {
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-    const signature = req.headers['x-razorpay-signature'] as string;
-
-    if (webhookSecret && signature) {
-      const shasum = crypto.createHmac('sha256', webhookSecret);
-      shasum.update(JSON.stringify(req.body));
-      const digest = shasum.digest('hex');
-
-      if (digest !== signature) {
-        res.status(400).json({ status: 'invalid_signature' });
-        return;
-      }
+    const webhookSecret = (process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
+    if (!webhookSecret) {
+      console.error('[Webhook] Rejected: RAZORPAY_WEBHOOK_SECRET is not configured.');
+      res.status(500).json({ status: 'config_error' });
+      return;
     }
 
-    const event = req.body.event;
-    if (event === 'payment.captured') {
-      const payment = req.body.payload.payment.entity;
-      const orderId = payment.order_id;
-      if (orderId) {
-        const reg = await Registration.findOne({ paymentOrderId: orderId });
-        if (reg) {
-          const qr = await generateRegistrationQR(reg._id.toString(), reg.eventId, reg.studentId);
-          const updated = await Registration.findOneAndUpdate(
-            {
-              paymentOrderId: orderId,
-              paymentStatus: { $ne: 'PAID' },
-            },
-            {
-              $set: {
-                paymentStatus: 'PAID',
-                registrationStatus: 'CONFIRMED',
-                paymentId: payment.id,
-                qrToken: qr.token,
-                qrCodeDataUrl: qr.dataUrl,
-              },
-            },
-            { new: true }
-          );
+    const signature = req.headers['x-razorpay-signature'];
+    if (!signature || typeof signature !== 'string' || signature.length === 0) {
+      res.status(400).json({ status: 'missing_signature' });
+      return;
+    }
 
-          if (updated) {
-            await Event.findByIdAndUpdate(reg.event, { $inc: { registeredCount: 1 } });
-          }
-        }
+    // The route MUST receive the raw body (express.raw). Never verify against
+    // a re-serialized object — key order/whitespace would break the HMAC.
+    if (!Buffer.isBuffer(req.body)) {
+      console.error('[Webhook] Rejected: raw request body unavailable.');
+      res.status(400).json({ status: 'raw_body_required' });
+      return;
+    }
+    const rawBody: Buffer = req.body;
+
+    const expected = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+    const expBuf = Buffer.from(expected, 'utf8');
+    const actBuf = Buffer.from(signature, 'utf8');
+    if (expBuf.length !== actBuf.length || !crypto.timingSafeEqual(expBuf, actBuf)) {
+      res.status(400).json({ status: 'invalid_signature' });
+      return;
+    }
+
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody.toString('utf8'));
+    } catch {
+      res.status(400).json({ status: 'malformed_payload' });
+      return;
+    }
+
+    // Signature is valid from here on — process the event.
+    const event = payload?.event;
+    if (event !== 'payment.captured') {
+      res.status(200).json({ status: 'ok' });
+      return;
+    }
+
+    const payment = payload?.payload?.payment?.entity;
+    const orderId = typeof payment?.order_id === 'string' ? payment.order_id : null;
+    const paymentId = typeof payment?.id === 'string' ? payment.id : null;
+    if (!orderId || !paymentId || payment?.status !== 'captured') {
+      res.status(200).json({ status: 'ok' });
+      return;
+    }
+
+    const reg = await Registration.findOne({ paymentOrderId: orderId });
+    if (!reg) {
+      // Unknown order: acknowledge so Razorpay stops retrying, but change nothing.
+      res.status(200).json({ status: 'ok' });
+      return;
+    }
+
+    const qr = await generateRegistrationQR(reg._id.toString(), reg.eventId, reg.studentId);
+    const updated = await Registration.findOneAndUpdate(
+      {
+        paymentOrderId: orderId,
+        paymentStatus: { $ne: 'PAID' },
+      },
+      {
+        $set: {
+          paymentStatus: 'PAID',
+          registrationStatus: 'CONFIRMED',
+          paymentId,
+          qrToken: qr.token,
+          qrCodeDataUrl: qr.dataUrl,
+        },
+      },
+      { new: true }
+    );
+
+    if (updated) {
+      // Capacity-gated increment, mirroring verifyPayment.
+      const eventDoc = await Event.findById(reg.event);
+      const capped = !!eventDoc && eventDoc.maxParticipants > 0;
+      if (!capped) {
+        await Event.findByIdAndUpdate(reg.event, { $inc: { registeredCount: 1 } });
+      } else {
+        await Event.findOneAndUpdate(
+          {
+            _id: reg.event,
+            $expr: { $lt: ['$registeredCount', '$maxParticipants'] },
+          },
+          { $inc: { registeredCount: 1 } }
+        );
       }
     }
 
     res.status(200).json({ status: 'ok' });
   } catch (error: any) {
-    console.error('[Webhook Error]', error);
+    console.error('[Webhook Error]', error?.message || error);
     res.status(500).json({ status: 'error' });
   }
 }

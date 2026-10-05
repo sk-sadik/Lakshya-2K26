@@ -256,6 +256,37 @@ export async function getAllRegistrationsAdmin(req: AuthenticatedRequest, res: R
       filter.paymentStatus = paymentStatus.toString().toUpperCase();
     }
 
+    // Coordinators (non-admin) only see registrations of events they own.
+    const userRoles = (req.user as AuthUser)?.roles || [];
+    if (!userRoles.includes('admin')) {
+      const userEmail = ((req.user as AuthUser)?.email || '').toLowerCase().trim();
+      const ownEvents = await Event.find({
+        $or: [{ coordinator: (req.user as AuthUser)?._id }, { coordinatorEmail: userEmail }],
+      }).select('_id customId');
+      const ownIds = new Set<string>();
+      for (const e of ownEvents) {
+        ownIds.add(e._id.toString());
+        if ((e as any).customId) ownIds.add((e as any).customId);
+      }
+      if (eventId && eventId !== 'all') {
+        // Resolve the requested event and confirm ownership (no ID probing).
+        const idStr = String(eventId);
+        const idConds: any[] = [{ customId: eventId }];
+        if (idStr.match(/^[0-9a-fA-F]{24}$/)) idConds.push({ _id: eventId });
+        const requested: any = await Event.findOne({ $or: idConds }).select('_id');
+        if (!requested || !ownIds.has(requested._id.toString())) {
+          res.status(403).json({ success: false, message: 'Forbidden. You can only view registrations of your own events.' });
+          return;
+        }
+        filter.$or = [{ event: requested._id }, { eventId: requested._id.toString() }];
+      } else {
+        filter.$or = [
+          { eventId: { $in: Array.from(ownIds) } },
+          { event: { $in: Array.from(ownIds).filter((k) => k.match(/^[0-9a-fA-F]{24}$/)) } },
+        ];
+      }
+    }
+
     const registrations = await Registration.find(filter).sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -268,7 +299,9 @@ export async function getAllRegistrationsAdmin(req: AuthenticatedRequest, res: R
   }
 }
 
-// GET /api/admin/analytics
+// GET /api/admin/analytics — every number below is a live database aggregate.
+// Registration-derived metrics (colleges, departments, events) use CONFIRMED
+// registrations only, deduplicated per student where counting people.
 export async function getSystemAnalytics(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const totalUsers = await User.countDocuments();
@@ -276,20 +309,82 @@ export async function getSystemAnalytics(req: AuthenticatedRequest, res: Respons
     const totalCoordinators = await User.countDocuments({ roles: 'coordinator' });
     const totalAdmins = await User.countDocuments({ roles: 'admin' });
     const totalEvents = await Event.countDocuments();
+    const upcomingEvents = await Event.countDocuments({ status: 'upcoming' });
+    const ongoingEvents = await Event.countDocuments({ status: 'ongoing' });
+    const completedEvents = await Event.countDocuments({ status: 'completed' });
+    const cancelledEvents = await Event.countDocuments({ status: 'cancelled' });
+    const approvedEvents = await Event.countDocuments({ approvalStatus: 'approved' });
+    const pendingEvents = await Event.countDocuments({ approvalStatus: 'pending' });
     const totalRegistrations = await Registration.countDocuments();
     const confirmedRegistrations = await Registration.countDocuments({ registrationStatus: 'CONFIRMED' });
+    const pendingRegistrations = await Registration.countDocuments({ registrationStatus: 'PENDING' });
+    const paidRegistrations = await Registration.countDocuments({ paymentStatus: 'PAID' });
     const checkedInRegistrations = await Registration.countDocuments({ checkedIn: true });
 
-    const lbrceStudents = await User.countDocuments({
-      roles: 'student',
-      college: { $regex: /Lakireddy Bali Reddy|LBRCE/i },
+    const confirmedRegs = await Registration.find({ registrationStatus: 'CONFIRMED' }).select(
+      'studentId studentEmail college department eventId eventName'
+    );
+
+    const isLbrceCollege = (college: any) =>
+      /Lakireddy Bali Reddy|LBRCE/i.test((college || '').toString());
+    // Unique students (one person in 3 events counts once as a participant,
+    // but 3 times across event/department/college registration totals).
+    const studentKey = (r: any) => String(r.studentId || r.studentEmail || '').toLowerCase();
+    const uniqueStudents = new Set(confirmedRegs.map(studentKey));
+    const lbrceRegs = confirmedRegs.filter((r) => isLbrceCollege(r.college));
+    const otherRegs = confirmedRegs.filter((r) => !isLbrceCollege(r.college));
+    const lbrceStudents = new Set(lbrceRegs.map(studentKey)).size;
+    const otherCollegeStudents = new Set(otherRegs.map(studentKey)).size;
+
+    const collegeMap = new Map<string, { fullName: string; count: number }>();
+    for (const r of confirmedRegs) {
+      const fullName = (r.college || 'Other Institution').toString().trim() || 'Other Institution';
+      const entry = collegeMap.get(fullName) || { fullName, count: 0 };
+      entry.count += 1;
+      collegeMap.set(fullName, entry);
+    }
+    const collegeStats = Array.from(collegeMap.values())
+      .map((c) => ({
+        college: c.fullName.replace(' (Autonomous)', '').replace(', Vijayawada', '').replace(', Guntur', ''),
+        fullName: c.fullName,
+        count: c.count,
+      }))
+      .sort((a, b) => b.count - a.count);
+    const participatingColleges = collegeStats.length;
+
+    const deptMap = new Map<string, number>();
+    for (const r of confirmedRegs) {
+      const dept = ((r.department || 'other') as string).toUpperCase();
+      deptMap.set(dept, (deptMap.get(dept) || 0) + 1);
+    }
+    const deptStats = Array.from(deptMap.entries())
+      .map(([name, registrations]) => ({ name, registrations }))
+      .sort((a, b) => b.registrations - a.registrations);
+
+    const events = await Event.find({}).select('_id eventName department maxParticipants');
+    const eventRegCounts = new Map<string, number>();
+    for (const r of confirmedRegs) {
+      const key = String((r as any).eventId || (r as any).event || '');
+      if (key) eventRegCounts.set(key, (eventRegCounts.get(key) || 0) + 1);
+    }
+    const popularEvents = events
+      .map((e: any) => ({
+        id: e._id.toString(),
+        title: e.eventName,
+        department: e.department,
+        capacity: e.maxParticipants,
+        registrations: eventRegCounts.get(e._id.toString()) || 0,
+      }))
+      .sort((a, b) => b.registrations - a.registrations);
+
+    const deptEventMap = new Map<string, number>();
+    for (const e of events as any[]) {
+      deptEventMap.set(String(e.department).toUpperCase(), (deptEventMap.get(String(e.department).toUpperCase()) || 0) + 1);
+    }
+    const deptWise: Record<string, number> = {};
+    deptEventMap.forEach((v, k) => {
+      deptWise[k] = v;
     });
-    const otherCollegeStudents = await User.countDocuments({
-      roles: 'student',
-      college: { $not: { $regex: /Lakireddy Bali Reddy|LBRCE/i } },
-    });
-    const participatingCollegesList = await User.distinct('college');
-    const participatingColleges = participatingCollegesList.filter(Boolean).length;
 
     // Aggregate paid revenue
     const revenueAgg = await Registration.aggregate([
@@ -309,8 +404,24 @@ export async function getSystemAnalytics(req: AuthenticatedRequest, res: Respons
         otherCollegeStudents,
         participatingColleges,
         totalEvents,
+        upcomingEvents,
+        ongoingEvents,
+        completedEvents,
+        cancelledEvents,
+        approvedEvents,
+        pendingEvents,
         totalRegistrations,
         confirmedRegistrations,
+        pendingRegistrations,
+        paidRegistrations,
+        participatingStudents: uniqueStudents.size,
+        lbrceRegistrations: lbrceRegs.length,
+        otherCollegeRegistrations: otherRegs.length,
+        multiEventStudentsCount: Math.max(confirmedRegs.length - uniqueStudents.size, 0),
+        collegeStats,
+        deptStats,
+        popularEvents,
+        deptWise,
         checkedInRegistrations,
         totalRevenue: `₹${totalRevenue.toLocaleString()}`,
         totalRevenueAmount: totalRevenue,
@@ -324,7 +435,15 @@ export async function getSystemAnalytics(req: AuthenticatedRequest, res: Respons
 // Notifications: GET, POST, DELETE
 export async function getNotifications(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { role, userId } = req.query;
+    // Identity comes from the JWT, never from query parameters: callers must
+    // not read another user's targeted notifications via userId, nor subscribe
+    // to another role's broadcasts via role.
+    const callerRoles: string[] = Array.isArray((req.user as any)?.roles)
+      ? (req.user as any).roles
+      : [((req.user as any)?.role as string)].filter(Boolean);
+    const requestedRole = typeof req.query.role === 'string' ? req.query.role : undefined;
+    const role = requestedRole && callerRoles.includes(requestedRole) ? requestedRole : callerRoles[0];
+    const ownUserId = (req.user as AuthUser)?._id.toString();
     const filter: any = {};
 
     if (role) {
@@ -332,7 +451,7 @@ export async function getNotifications(req: AuthenticatedRequest, res: Response)
         { targetRole: 'all' },
         { targetRole: role },
         { userId: 'all' },
-        { userId: userId },
+        { userId: ownUserId },
       ];
     }
 
@@ -346,12 +465,18 @@ export async function getNotifications(req: AuthenticatedRequest, res: Response)
 export async function sendNotification(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const { targetRole, title, message, type, userId } = req.body;
+    const allowedTargets = ['all', 'student', 'coordinator', 'admin'];
+    const allowedTypes = ['info', 'success', 'warning', 'alert'];
+    if (!title?.toString().trim() || !message?.toString().trim()) {
+      res.status(400).json({ success: false, message: 'Title and message are required.' });
+      return;
+    }
     const notif = await Notification.create({
-      targetRole: targetRole || 'all',
-      userId: userId || 'all',
-      title,
-      message,
-      type: type || 'info',
+      targetRole: allowedTargets.includes(targetRole) ? targetRole : 'all',
+      userId: typeof userId === 'string' && userId.trim() ? userId.trim().slice(0, 64) : 'all',
+      title: title.toString().trim().slice(0, 200),
+      message: message.toString().trim().slice(0, 5000),
+      type: allowedTypes.includes(type) ? type : 'info',
       read: false,
       senderName: req.user?.name || 'Administrator',
       senderRole: (((req.user as AuthUser)?.roles?.[0]) as 'admin' | 'coordinator' | 'student') || 'admin',
@@ -400,12 +525,28 @@ export async function getSupportReports(req: AuthenticatedRequest, res: Response
 
 export async function createSupportReport(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const report = await SupportReport.create({
-      ...req.body,
-      senderId: req.user?._id.toString() || req.body.senderId,
-      senderName: req.user?.name || req.body.senderName,
-      senderEmail: (req.user?.email || req.body.senderEmail).toLowerCase().trim(),
-      senderRole: ((req.user as AuthUser)?.roles?.[0]) || req.body.senderRole || 'student',
+    // Whitelist client-settable fields; identity and workflow state always
+    // come from the server (no impersonation, no self-resolving reports).
+    const { subject, message, category, priority } = req.body || {};
+    if (!subject?.toString().trim() || !message?.toString().trim()) {
+      res.status(400).json({ success: false, message: 'Subject and message are required.' });
+      return;
+    }
+    const allowedCategories = ['issue', 'query', 'requisition', 'feedback', 'emergency'];
+    const allowedPriorities = ['low', 'medium', 'high', 'urgent'];
+    const report: any = await SupportReport.create({
+      senderId: req.user?._id.toString(),
+      senderName: req.user?.name,
+      senderEmail: (req.user?.email || '').toLowerCase().trim(),
+      senderPhone: (req.user as any)?.phone,
+      senderCollege: (req.user as any)?.college,
+      senderDepartment: (req.user as any)?.department,
+      senderRole: (((req.user as any)?.roles?.[0] || 'student') as 'student' | 'coordinator' | 'admin'),
+      subject: subject.toString().trim().slice(0, 200),
+      message: message.toString().trim().slice(0, 5000),
+      category: allowedCategories.includes(category) ? category : 'query',
+      priority: allowedPriorities.includes(priority) ? priority : 'medium',
+      status: 'unread',
     });
     res.status(201).json({ success: true, report: report.toJSON() });
   } catch (error: any) {

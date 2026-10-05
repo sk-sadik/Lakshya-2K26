@@ -66,7 +66,7 @@ export const StudentSupportSection: React.FC<StudentSupportSectionProps> = ({
       });
 
       SoundEngine.playSuccess();
-      showToast('Message transmitted to Lakshya 2026 Central Admin. You will be notified upon reply!', 'success');
+      showToast('Message transmitted to Lakshya 2027 Central Admin. You will be notified upon reply!', 'success');
       setSubject('');
       setMessage('');
       setActiveTab('history');

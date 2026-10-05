@@ -86,7 +86,7 @@ export async function generateCoupon(req: AuthenticatedRequest, res: Response): 
       if (existingCoupon.status === 'USED') {
         res.status(400).json({
           success: false,
-          message: `You have already redeemed your Lakshya 2026 food coupon on ${existingCoupon.redeemedAt?.toLocaleString() || 'record'}.`,
+          message: `You have already redeemed your Lakshya 2027 food coupon on ${existingCoupon.redeemedAt?.toLocaleString() || 'record'}.`,
           coupon: existingCoupon.toJSON(),
         });
         return;
@@ -164,12 +164,22 @@ export async function generateCoupon(req: AuthenticatedRequest, res: Response): 
       qrCodeDataUrl,
     });
 
+    let couponJson = newCoupon.toJSON();
+    if (emailResult.success) {
+      const emailed = await FoodCoupon.findByIdAndUpdate(
+        newCoupon._id,
+        { emailed: true, emailedAt: new Date() },
+        { new: true }
+      );
+      if (emailed) couponJson = emailed.toJSON();
+    }
+
     res.status(201).json({
       success: true,
       message: emailResult.success
         ? `Food coupon generated successfully and dispatched to ${userEmail}!`
         : `Food coupon generated in MongoDB. (Note: Email delivery warning: ${emailResult.error})`,
-      coupon: newCoupon.toJSON(),
+      coupon: couponJson,
       emailDelivered: emailResult.success,
       emailError: emailResult.error,
     });
@@ -289,18 +299,37 @@ export async function redeemCoupon(req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
-    // Atomic redemption
-    coupon.status = 'USED';
-    coupon.redeemedAt = new Date();
-    coupon.redeemedBy = req.user?.name || req.body.staffName || 'Dining Coordinator';
-    await coupon.save();
+    // Atomic redemption: exactly one concurrent scan can flip ACTIVE -> USED.
+    const redeemed = await FoodCoupon.findOneAndUpdate(
+      { _id: coupon._id, status: 'ACTIVE' },
+      {
+        $set: {
+          status: 'USED',
+          redeemedAt: new Date(),
+          redeemedBy: req.user?.name || req.body.staffName || 'Dining Coordinator',
+        },
+      },
+      { new: true }
+    );
 
-    console.log(`[Coupon Redeemed] Code: ${coupon.couponCode}, User: ${coupon.userEmail}, RedeemedBy: ${coupon.redeemedBy}`);
+    if (!redeemed) {
+      const fresh = await FoodCoupon.findById(coupon._id);
+      res.status(400).json({
+        success: false,
+        message: fresh?.status === 'USED'
+          ? `This coupon has ALREADY been used on ${fresh?.redeemedAt?.toLocaleString()} by ${fresh?.redeemedBy || 'Staff'}. Re-use is prohibited.`
+          : 'This coupon can no longer be redeemed.',
+        coupon: fresh ? fresh.toJSON() : coupon.toJSON(),
+      });
+      return;
+    }
+
+    console.log(`[Coupon Redeemed] Code: ${redeemed.couponCode}, User: ${redeemed.userEmail}, RedeemedBy: ${redeemed.redeemedBy}`);
 
     res.status(200).json({
       success: true,
-      message: `Coupon ${coupon.couponCode} redeemed successfully! Meal authorized for ${coupon.userName}.`,
-      coupon: coupon.toJSON(),
+      message: `Coupon ${redeemed.couponCode} redeemed successfully! Meal authorized for ${redeemed.userName}.`,
+      coupon: redeemed.toJSON(),
     });
   } catch (error: any) {
     console.error('[Redeem Coupon Error]', error);
@@ -445,6 +474,8 @@ export async function generateTokensForEventParticipants(req: AuthenticatedReque
       }
       targetEvents = [event];
     } else {
+      // No eventId: admins cover every event with confirmed registrations;
+      // coordinators cover ONLY their own events (never another desk's).
       const regs = await Registration.find({ registrationStatus: 'CONFIRMED' }).select('event eventId');
       const keys = new Set<string>();
       for (const r of regs) {
@@ -452,8 +483,21 @@ export async function generateTokensForEventParticipants(req: AuthenticatedReque
         else if ((r as any).eventId) keys.add(String((r as any).eventId));
       }
       const found = await Event.find({ _id: { $in: Array.from(keys).filter((k) => k.match(/^[0-9a-fA-F]{24}$/)) } });
+      const roles: string[] = Array.isArray((req.user as any)?.roles)
+        ? (req.user as any).roles
+        : [((req.user as any)?.role as string)].filter(Boolean);
+      const isAdmin = roles.includes('admin');
+      const userEmail = ((req.user as any)?.email || '').toLowerCase().trim();
       const byId = new Map(found.map((e: any) => [e._id.toString(), e]));
-      targetEvents = Array.from(keys).map((k) => byId.get(k)).filter(Boolean);
+      targetEvents = Array.from(keys)
+        .map((k) => byId.get(k))
+        .filter((e) => !!e)
+        .filter(
+          (e: any) =>
+            isAdmin ||
+            String(e.coordinator || '') === String((req.user as any)?._id) ||
+            (e.coordinatorEmail || '').toLowerCase().trim() === userEmail
+        );
     }
 
     if (targetEvents.length === 0) {
@@ -648,6 +692,8 @@ export async function sendCouponEmailsToParticipants(req: AuthenticatedRequest, 
 
       if (emailResult.success) {
         sent++;
+        // Move out of the pending list into the received list.
+        await FoodCoupon.findByIdAndUpdate(coupon._id, { emailed: true, emailedAt: new Date() });
       } else {
         failed++;
         failedEmails.push(coupon.userEmail);
@@ -714,6 +760,9 @@ export async function sendCouponToEmailAdmin(req: AuthenticatedRequest, res: Res
           emailDelivered: resend.success,
           emailError: resend.error,
         });
+        if (resend.success) {
+          await FoodCoupon.findByIdAndUpdate(existing._id, { emailed: true, emailedAt: new Date() });
+        }
         return;
       }
 
@@ -786,6 +835,9 @@ export async function sendCouponToEmailAdmin(req: AuthenticatedRequest, res: Res
       emailDelivered: emailResult.success,
       emailError: emailResult.error,
     });
+    if (emailResult.success) {
+      await FoodCoupon.findByIdAndUpdate(newCoupon._id, { emailed: true, emailedAt: new Date() });
+    }
   } catch (error: any) {
     console.error('[Send Coupon To Email Error]', error);
     res.status(500).json({ success: false, message: error.message || 'Error sending food coupon to email.' });
@@ -827,10 +879,17 @@ export async function sendCouponEmailById(req: AuthenticatedRequest, res: Respon
       return;
     }
 
+    // Mark as emailed so it leaves the coordinator's pending list.
+    const emailedCoupon = await FoodCoupon.findByIdAndUpdate(
+      coupon._id,
+      { emailed: true, emailedAt: new Date() },
+      { new: true }
+    );
+
     res.status(200).json({
       success: true,
       message: `Food pass successfully emailed to ${coupon.userEmail}!`,
-      coupon: coupon.toJSON(),
+      coupon: (emailedCoupon || coupon).toJSON(),
       emailDelivered: true,
     });
   } catch (error: any) {

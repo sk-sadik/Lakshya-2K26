@@ -36,13 +36,13 @@ export function managedEventToEventItem(m: ManagedEvent): EventItem {
       m.description && m.description.length > 85
         ? m.description.slice(0, 85) + '...'
         : m.description || 'Official LBRCE Lakshya Competition',
-    description: m.description || 'LBRCE Lakshya 2026 National Level Symposium competition.',
+    description: m.description || 'LBRCE Lakshya 2027 National Level Symposium competition.',
     prizes: {
-      first: m.prizes?.first || 'â‚¹10,000',
-      second: m.prizes?.second || 'â‚¹5,000',
+      first: m.prizes?.first || '₹10,000',
+      second: m.prizes?.second || '₹5,000',
       third: m.prizes?.third,
     },
-    entryFee: m.entryFee || 'â‚¹150',
+    entryFee: m.entryFee || '₹150',
     teamSize: m.teamSize || '1-3 Members',
     venue: m.venue || 'LBRCE Campus',
     timing: m.time || '10:00 AM - 01:00 PM',
@@ -160,10 +160,10 @@ export class DatabaseService {
           category: e.category,
           coordinator: 'admin-convener',
           coordinatorName: e.coordinators[0]?.name || 'Coordinator',
-          date: 'Feb 20-21, 2026',
+          date: 'Feb 20-21, 2027',
           time: e.timing,
           venue: e.venue,
-          registrationDeadline: '2026-02-19T23:59:59Z',
+          registrationDeadline: '2027-02-19T23:59:59Z',
           maxParticipants: 100,
           entryFee: e.entryFee,
           registrationFee: e.entryFee,
@@ -485,7 +485,7 @@ export class DatabaseService {
     college?: string;
     department?: string;
     teamMembers?: string;
-  }): Promise<{ registration: Registration; isPaid?: boolean; paymentOrder?: any }> {
+  }): Promise<{ registration: Registration; isPaid?: boolean; paymentOrder?: any; orderError?: string }> {
     const res = await authFetch(`/api/events/${details.eventId}/register`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -502,6 +502,7 @@ export class DatabaseService {
       registration: data.registration,
       isPaid: data.isPaid,
       paymentOrder: data.paymentOrder,
+      orderError: data.orderError,
     };
   }
 
@@ -658,44 +659,19 @@ export class DatabaseService {
   }
 
   public async getSystemAnalytics(): Promise<any> {
-    const defaultDeptStats = [
-      { name: 'CSE', registrations: 4 },
-      { name: 'IT', registrations: 3 },
-      { name: 'AI&DS', registrations: 2 },
-      { name: 'AIML', registrations: 2 },
-      { name: 'ECE', registrations: 2 },
-      { name: 'EEE', registrations: 1 },
-      { name: 'MECH', registrations: 1 },
-      { name: 'CIVIL', registrations: 1 },
-      { name: 'AERO', registrations: 1 },
-    ];
-
-    const defaultCollegeStats = [
-      { college: 'LBRCE (Autonomous)', count: 7 },
-      { college: 'VR Siddhartha', count: 2 },
-      { college: 'JNTU Kakinada', count: 1 },
-      { college: 'KL University', count: 1 },
-    ];
-
-    const defaultPopularEvents = [
-      { id: '1', title: 'Code Genesis', department: 'CSE', capacity: 100, registrations: 5 },
-      { id: '2', title: 'Circuitronix', department: 'ECE', capacity: 100, registrations: 3 },
-      { id: '3', title: 'Bot Battles', department: 'MECH', capacity: 100, registrations: 2 },
-      { id: '4', title: 'Web Sparks', department: 'IT', capacity: 100, registrations: 2 },
-    ];
-
     try {
       const res = await authFetch('/api/admin/analytics', { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         if (data.analytics) {
-          const totalUsers = data.analytics.totalUsers ?? 0;
-          const totalStudents = data.analytics.totalStudents ?? 0;
-          const totalCoordinators = data.analytics.totalCoordinators ?? 0;
-          const totalAdmins = data.analytics.totalAdmins ?? Math.max(0, totalUsers - totalStudents - totalCoordinators);
-          const totalEvents = data.analytics.totalEvents ?? 0;
-          const totalRegistrations = data.analytics.totalRegistrations ?? 0;
-          const confirmedRegistrations = data.analytics.confirmedRegistrations ?? 0;
+          const a = data.analytics;
+          const totalUsers = a.totalUsers ?? 0;
+          const totalStudents = a.totalStudents ?? 0;
+          const totalCoordinators = a.totalCoordinators ?? 0;
+          const totalAdmins = a.totalAdmins ?? Math.max(0, totalUsers - totalStudents - totalCoordinators);
+          const totalEvents = a.totalEvents ?? 0;
+          const totalRegistrations = a.totalRegistrations ?? 0;
+          const confirmedRegistrations = a.confirmedRegistrations ?? 0;
 
           return {
             users: {
@@ -703,31 +679,37 @@ export class DatabaseService {
               students: totalStudents,
               coordinators: totalCoordinators,
               admins: totalAdmins,
-              lbrceRegisteredStudents: data.analytics.lbrceStudents ?? 0,
-              otherCollegeStudents: data.analytics.otherCollegeStudents ?? 0,
-              participatingColleges: data.analytics.participatingColleges ?? (totalUsers > 0 ? 1 : 0),
+              lbrceRegisteredStudents: a.lbrceStudents ?? 0,
+              otherCollegeStudents: a.otherCollegeStudents ?? 0,
+              participatingColleges: a.participatingColleges ?? 0,
             },
             events: {
               total: totalEvents,
-              upcoming: totalEvents,
-              ongoing: 0,
-              completed: 0,
-              cancelled: 0,
-              deptWise: {},
+              upcoming: a.upcomingEvents ?? totalEvents,
+              ongoing: a.ongoingEvents ?? 0,
+              completed: a.completedEvents ?? 0,
+              cancelled: a.cancelledEvents ?? 0,
+              approved: a.approvedEvents ?? totalEvents,
+              pending: a.pendingEvents ?? 0,
+              deptWise: a.deptWise ?? {},
             },
             registrations: {
               total: totalRegistrations,
               active: confirmedRegistrations,
-              participatingStudents: confirmedRegistrations,
-              lbrceRegistrations: 0,
-              otherCollegeRegistrations: 0,
-              multiEventStudentsCount: 0,
-              collegeStats: [],
-              deptStats: [],
-              popularEvents: [],
+              participatingStudents: a.participatingStudents ?? confirmedRegistrations,
+              confirmed: confirmedRegistrations,
+              pending: a.pendingRegistrations ?? 0,
+              paid: a.paidRegistrations ?? 0,
+              lbrceRegistrations: a.lbrceRegistrations ?? 0,
+              otherCollegeRegistrations: a.otherCollegeRegistrations ?? 0,
+              multiEventStudentsCount: a.multiEventStudentsCount ?? 0,
+              collegeStats: a.collegeStats ?? [],
+              deptStats: a.deptStats ?? [],
+              popularEvents: a.popularEvents ?? [],
             },
-            totalRevenue: data.analytics.totalRevenue || 'â‚¹0',
-            checkedInRegistrations: data.analytics.checkedInRegistrations ?? 0,
+            totalRevenue: a.totalRevenue || '₹0',
+            totalRevenueAmount: a.totalRevenueAmount ?? 0,
+            checkedInRegistrations: a.checkedInRegistrations ?? 0,
           };
         }
       }
@@ -740,7 +722,7 @@ export class DatabaseService {
       users: { total: 0, students: 0, coordinators: 0, admins: 0, lbrceRegisteredStudents: 0, otherCollegeStudents: 0, participatingColleges: 0 },
       events: { total: this.eventsCache.length || 0, upcoming: this.eventsCache.length || 0, ongoing: 0, completed: 0, cancelled: 0, deptWise: {} },
       registrations: { total: this.registrationsCache.length || 0, active: 0, participatingStudents: 0, lbrceRegistrations: 0, otherCollegeRegistrations: 0, multiEventStudentsCount: 0, collegeStats: [], deptStats: [], popularEvents: [] },
-      totalRevenue: 'â‚¹0',
+      totalRevenue: '₹0',
       checkedInRegistrations: 0,
     };
   }

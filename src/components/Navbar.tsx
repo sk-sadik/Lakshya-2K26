@@ -91,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 LAKSHYA
               </span>
               <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/40">
-                2026
+                2027
               </span>
             </div>
             <p className="text-[10px] font-mono text-purple-300/80 tracking-wider hidden sm:block">

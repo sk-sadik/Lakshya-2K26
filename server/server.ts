@@ -3,11 +3,13 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectDB } from './config/db';
 import { seedDatabase } from './seed/seedData';
+import { validateProductionEnv, isProduction } from './config/env';
 
 import authRoutes from './routes/authRoutes';
 import eventRoutes from './routes/eventRoutes';
@@ -20,6 +22,19 @@ import couponRoutes from './routes/couponRoutes';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust the Render proxy/load balancer (first hop) so rate limiting and
+// client-IP detection see the real client address. Single-hop trust only.
+app.set('trust proxy', 1);
+
+// Secure HTTP headers. CSP is off so Razorpay Checkout (cross-origin
+// iframe/popup) and the Vite bundle keep working; CORS behaviour unchanged.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
 // Enable CORS for frontend development and production URLs
 app.use(
   cors({
@@ -28,9 +43,15 @@ app.use(
   })
 );
 
-// Body parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Razorpay webhooks need the ORIGINAL RAW body for HMAC verification.
+// Mounted before the JSON parser; the raw middleware marks the request as
+// parsed so later body parsers skip it.
+app.use('/api/payment/webhook', express.raw({ type: 'application/json', limit: '100kb' }));
+
+// Body parsers with explicit size limits (announcements/descriptions/team data
+// are all far below this; file uploads do not exist in this app).
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Request logging in development
 if (process.env.NODE_ENV !== 'test') {
@@ -45,7 +66,7 @@ app.get('/api/health', (_req, res) => {
   res.status(200).json({
     status: 'online',
     timestamp: new Date().toISOString(),
-    service: 'Lakshya 2026 Symposium Backend',
+    service: 'Lakshya 2027 Symposium Backend',
   });
 });
 
@@ -74,17 +95,22 @@ if (fs.existsSync(distDir)) {
   });
 }
 
-// Global error handler
+// Global error handler. In production, unexpected errors return a generic
+// message (no stack traces, paths, or secrets leak to clients); details stay
+// in server logs.
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[Unhandled Server Error]', err);
-  res.status(500).json({
+  const status = typeof err?.status === 'number' ? err.status : 500;
+  res.status(status).json({
     success: false,
-    message: err.message || 'Internal Server Error',
+    message: status === 500 && isProduction ? 'Internal Server Error.' : err.message || 'Internal Server Error',
   });
 });
 
 // Start Server and connect to MongoDB
 async function startServer() {
+  // Fail fast on missing/weak production secrets before opening any socket.
+  validateProductionEnv();
   await connectDB();
   await seedDatabase();
 
@@ -122,7 +148,7 @@ async function startServer() {
   }
 
   const server = app.listen(PORT, () => {
-    console.log(`🚀 [Server] Lakshya 2026 Backend running on http://localhost:${PORT}`);
+    console.log(`🚀 [Server] Lakshya 2027 Backend running on http://localhost:${PORT}`);
   });
   // Optimize keep-alive connections for high concurrency (1000+ simultaneous requests)
   server.keepAliveTimeout = 65000;

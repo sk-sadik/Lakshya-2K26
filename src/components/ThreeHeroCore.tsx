@@ -430,7 +430,7 @@ export const ThreeHeroCore: React.FC<ThreeHeroCoreProps> = ({ onExploreEvents, o
         <div className="mb-3 pointer-events-auto">
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs sm:text-sm md:text-base font-mono font-bold uppercase tracking-widest bg-pink-500/25 text-pink-300 border border-pink-400/60 backdrop-blur-md shadow-xl shadow-pink-500/25">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            2026 EDITION
+            2027 EDITION
           </span>
         </div>
 

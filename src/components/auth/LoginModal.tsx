@@ -27,6 +27,8 @@ interface LoginModalProps {
   onClose: () => void;
   onLoginSuccess: (user: Omit<User, 'passwordHash'>) => void;
   initialRole?: UserRole;
+  /** When true the modal opens on account creation (register-first flows). */
+  initialRegisterMode?: boolean;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
@@ -34,9 +36,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onClose,
   onLoginSuccess,
   initialRole = 'student',
+  initialRegisterMode = false,
 }) => {
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(initialRegisterMode);
   const [isResetMode, setIsResetMode] = useState(false);
 
   // OTP verification for registration
@@ -90,6 +93,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     try {
       setLoading(true);
       const user = await dbService.login(email.trim(), password, activeRole);
+      // Existing account but email not verified: route into OTP verification
+      // instead of signing in; success continues via handleVerifyRegistrationOTP.
+      if (!user.isEmailVerified) {
+        setRegEmail(email.trim());
+        setRegName(user.name || '');
+        setIsRegisterMode(true);
+        setRegistrationStep('verify');
+        setSuccessMessage(`Almost there — verify the 6-digit OTP sent to ${email.trim()} to activate your account. Use Resend if it hasn't arrived.`);
+        setOtpResendCountdown(0);
+        SoundEngine.playClick();
+        return;
+      }
       SoundEngine.playSuccess();
       setSuccessMessage(`Welcome back, ${user.name}!`);
       setTimeout(() => {
@@ -362,7 +377,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
             </div>
             <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-pink-500/25 border border-pink-400/40 text-[10px] font-mono text-pink-300 font-bold backdrop-blur-md">
-              Lakshya 2026
+              Lakshya 2027
             </span>
           </div>
         </div>
@@ -372,7 +387,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <div className="flex items-center gap-2 text-pink-400 mb-1">
             <Sparkles className="w-4 h-4" />
             <span className="text-[11px] font-mono uppercase tracking-widest font-bold">
-              Lakshya 2026 Portal
+              Lakshya 2027 Portal
             </span>
           </div>
 

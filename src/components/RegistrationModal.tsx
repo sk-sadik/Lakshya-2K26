@@ -143,7 +143,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         teamMembers: teamMembersStr,
       });
 
-      if (!res.isPaid || !res.paymentOrder) {
+      if (!res.isPaid) {
         // Free Event -> Instantly confirmed
         setRegId(res.registration.qrToken || res.registration.id);
         setQrDataUrl(res.registration.qrCodeDataUrl || null);
@@ -152,6 +152,15 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         try {
           confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
         } catch {}
+      } else if (!res.paymentOrder) {
+        // Paid event saved as PENDING but the gateway order failed:
+        // do NOT celebrate — direct the student to pay from the dashboard.
+        setIsProcessing(false);
+        setValidationError(
+          (res.orderError || 'Payment order could not be created.') +
+            ' Your registration is saved as PENDING — complete the payment from your student dashboard.'
+        );
+        return;
       } else {
         // Paid Event -> Initiate official Razorpay checkout
         const order = res.paymentOrder;
@@ -169,7 +178,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
           key: order.key,
           amount: order.amount,
           currency: order.currency,
-          name: 'LBRCE Lakshya 2026',
+          name: 'LBRCE Lakshya 2027',
           description: `Event Registration: ${order.eventName}`,
           order_id: order.id,
           prefill: {
@@ -527,7 +536,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               Registration Confirmed!
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto mb-6">
-              Welcome to Lakshya 2026. Your delegate pass has been cryptographically confirmed and registered with the LBRCE festival turnstiles.
+              Welcome to Lakshya 2027. Your delegate pass has been cryptographically confirmed and registered with the LBRCE festival turnstiles.
             </p>
 
             {/* QR Code and Pass token display */}

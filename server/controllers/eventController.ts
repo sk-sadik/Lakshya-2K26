@@ -2,6 +2,22 @@ import { Request, Response } from 'express';
 import { Event } from '../models/Event';
 import { AuthenticatedRequest, AuthUser } from '../middleware/auth';
 
+/** Escape user input before building a RegExp (prevents ReDoS / injection). */
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** True for admins and coordinators (see full public list); students/public see only open events. */
+function seesAllEvents(user: any): boolean {
+  const roles: string[] = Array.isArray(user?.roles) ? user.roles : [user?.role].filter(Boolean);
+  return roles.includes('admin') || roles.includes('coordinator');
+}
+
+function userIsAdmin(user: any): boolean {
+  const roles: string[] = Array.isArray(user?.roles) ? user.roles : [user?.role].filter(Boolean);
+  return roles.includes('admin');
+}
+
 // Helper to parse entry fee number from string like '₹150', '150', or 'Free'
 function parseFeeAmount(feeStr?: string): { feeAmount: number; isPaid: boolean } {
   if (!feeStr || feeStr.toLowerCase().includes('free')) {
@@ -23,10 +39,19 @@ function parseRegistrationFee(feeStr?: string): { registrationFee: string; feeAm
 }
 
 // GET /api/events
-export async function getAllEvents(req: Request, res: Response): Promise<void> {
+export async function getAllEvents(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { department, category, search, status } = req.query;
+    const { department, category, search, status, page, limit } = req.query;
     const filter: any = {};
+
+    // Public visibility: students and anonymous callers only see approved,
+    // currently-open events. Coordinators/admins see everything they manage.
+    if (!seesAllEvents(req.user)) {
+      filter.approvalStatus = 'approved';
+      filter.status = { $in: ['upcoming', 'ongoing'] };
+    } else if (status && status !== 'all') {
+      filter.status = status;
+    }
 
     if (department && department !== 'all') {
       filter.department = department;
@@ -36,12 +61,9 @@ export async function getAllEvents(req: Request, res: Response): Promise<void> {
       filter.category = category;
     }
 
-    if (status && status !== 'all') {
-      filter.status = status;
-    }
-
-    if (search) {
-      const searchRegex = new RegExp(search.toString(), 'i');
+    if (typeof search === 'string' && search.trim()) {
+      const term = search.trim().slice(0, 100);
+      const searchRegex = new RegExp(escapeRegExp(term), 'i');
       filter.$or = [
         { title: searchRegex },
         { eventName: searchRegex },
@@ -50,11 +72,22 @@ export async function getAllEvents(req: Request, res: Response): Promise<void> {
       ];
     }
 
-    const events = await Event.find(filter).sort({ createdAt: -1 });
+    // Bounded pagination: default 50, hard cap 100.
+    const pageNum = Math.max(parseInt(String(page || '1'), 10) || 1, 1);
+    const pageSize = Math.min(Math.max(parseInt(String(limit || '50'), 10) || 50, 1), 100);
+
+    const total = await Event.countDocuments(filter);
+    const events = await Event.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((pageNum - 1) * pageSize)
+      .limit(pageSize);
 
     res.status(200).json({
       success: true,
       count: events.length,
+      total,
+      page: pageNum,
+      limit: pageSize,
       events,
     });
   } catch (error: any) {
@@ -122,9 +155,16 @@ export async function createEvent(req: AuthenticatedRequest, res: Response): Pro
       isPaid,
       coordinator: req.user._id,
       coordinatorName: req.body.coordinatorName || req.user.name,
-      coordinatorEmail: req.body.coordinatorEmail || req.user.email,
+      // Coordinators cannot file events under someone else's email (ownership
+      // checks trust this field); admins may set it explicitly.
+      coordinatorEmail: userIsAdmin(req.user)
+        ? (req.body.coordinatorEmail || req.user.email || '').toLowerCase()
+        : (req.user.email || '').toLowerCase(),
       department: req.body.department || req.user.department || 'cse',
       registeredCount: 0,
+      // Coordinators cannot self-approve or pre-seed counts; admins use the
+      // dedicated approval flow. New coordinator events start pending review.
+      approvalStatus: userIsAdmin(req.user) ? req.body.approvalStatus || 'approved' : 'pending',
     });
 
     console.log('[Create Event] Created event:', newEvent);
@@ -158,10 +198,15 @@ export async function updateEvent(req: AuthenticatedRequest, res: Response): Pro
       return;
     }
 
-    // Check ownership if user is coordinator (admins are exempt)
+    // Check ownership if user is coordinator (admins are exempt).
+    // Events with no owner on record are admin-only.
     const userRoles = (req.user as AuthUser)?.roles || [];
-    if (userRoles.includes('coordinator') && !userRoles.includes('admin') && event.coordinator && event.coordinator.toString() !== req.user?._id.toString()) {
-      if (event.coordinatorEmail && event.coordinatorEmail.toLowerCase() !== req.user?.email?.toLowerCase()) {
+    if (!userRoles.includes('admin')) {
+      const idMatch = event.coordinator && event.coordinator.toString() === req.user?._id.toString();
+      const emailMatch =
+        event.coordinatorEmail &&
+        event.coordinatorEmail.toLowerCase() === req.user?.email?.toLowerCase();
+      if (!idMatch && !emailMatch) {
         res.status(403).json({ success: false, message: 'Forbidden. You can only update events you coordinate.' });
         return;
       }
@@ -183,6 +228,15 @@ export async function updateEvent(req: AuthenticatedRequest, res: Response): Pro
     if (req.body.title || req.body.eventName) {
       req.body.title = req.body.title || req.body.eventName;
       req.body.eventName = req.body.title;
+    }
+
+    // Mass-assignment guard: coordinators cannot reassign ownership, rewrite
+    // seat counts, spoof the coordinator email, or self-approve rejections.
+    if (!userIsAdmin(req.user)) {
+      delete req.body.registeredCount;
+      delete req.body.coordinator;
+      delete req.body.coordinatorEmail;
+      delete req.body.approvalStatus;
     }
 
     const updated = await Event.findByIdAndUpdate(event._id, req.body, { new: true });
@@ -216,10 +270,15 @@ export async function deleteEvent(req: AuthenticatedRequest, res: Response): Pro
       return;
     }
 
-    // Check ownership if user is coordinator (admins are exempt)
+    // Check ownership if user is coordinator (admins are exempt).
+    // Events with no owner on record are admin-only.
     const userRoles = (req.user as AuthUser)?.roles || [];
-    if (userRoles.includes('coordinator') && !userRoles.includes('admin') && event.coordinator && event.coordinator.toString() !== req.user?._id.toString()) {
-      if (event.coordinatorEmail && event.coordinatorEmail.toLowerCase() !== req.user?.email?.toLowerCase()) {
+    if (!userRoles.includes('admin')) {
+      const idMatch = event.coordinator && event.coordinator.toString() === req.user?._id.toString();
+      const emailMatch =
+        event.coordinatorEmail &&
+        event.coordinatorEmail.toLowerCase() === req.user?.email?.toLowerCase();
+      if (!idMatch && !emailMatch) {
         res.status(403).json({ success: false, message: 'Forbidden. You can only delete events you coordinate.' });
         return;
       }

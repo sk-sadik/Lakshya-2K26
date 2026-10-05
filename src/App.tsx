@@ -29,6 +29,10 @@ export default function App() {
   const [activeModalEvent, setActiveModalEvent] = useState<EventItem | null>(null);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [registerEventTarget, setRegisterEventTarget] = useState<EventItem | null>(null);
+  // When a logged-out user hits Register: stash the target (event or general),
+  // force account creation/login first, then resume exactly where they left off.
+  const [pendingRegTarget, setPendingRegTarget] = useState<EventItem | null | undefined>(undefined);
+  const [authFlow, setAuthFlow] = useState<'login' | 'register'>('login');
 
   // Role-Based Auth & View State
   const [currentUser, setCurrentUser] = useState<Omit<User, 'passwordHash'> | null>(() => {
@@ -73,13 +77,26 @@ export default function App() {
   };
 
   const handleOpenRegisterForEvent = (event: EventItem) => {
-    setRegisterEventTarget(event);
-    setIsRegisterOpen(true);
+    if (currentUser) {
+      setRegisterEventTarget(event);
+      setIsRegisterOpen(true);
+    } else {
+      // Not authenticated: stash the event, require account first.
+      setPendingRegTarget(event);
+      setAuthFlow('register');
+      setIsLoginOpen(true);
+    }
   };
 
   const handleOpenGeneralRegister = () => {
-    setRegisterEventTarget(null);
-    setIsRegisterOpen(true);
+    if (currentUser) {
+      setRegisterEventTarget(null);
+      setIsRegisterOpen(true);
+    } else {
+      setPendingRegTarget(null);
+      setAuthFlow('register');
+      setIsLoginOpen(true);
+    }
   };
 
   const handleScrollToSection = (sectionId: string) => {
@@ -96,8 +113,15 @@ export default function App() {
     setCurrentUser(user);
     setActiveDashboardRole(user.role || (user.roles?.[0]) || 'student');
     setIsLoginOpen(false);
-    // Direct redirect to dedicated dashboard as requested
-    setCurrentView('dashboard');
+    if (pendingRegTarget !== undefined) {
+      // Resume the exact registration the user started before authenticating.
+      setRegisterEventTarget(pendingRegTarget);
+      setPendingRegTarget(undefined);
+      setIsRegisterOpen(true);
+    } else {
+      // Direct redirect to dedicated dashboard as requested
+      setCurrentView('dashboard');
+    }
   };
 
   const handleSwitchRole = (role: UserRole) => {
@@ -173,7 +197,11 @@ export default function App() {
       <Navbar
         onOpenPass={() => handleScrollToSection('pass-section')}
         onOpenRegister={handleOpenGeneralRegister}
-        onOpenLogin={() => setIsLoginOpen(true)}
+        onOpenLogin={() => {
+          setPendingRegTarget(undefined);
+          setAuthFlow('login');
+          setIsLoginOpen(true);
+        }}
         currentUser={currentUser}
         onOpenDashboard={() => setCurrentView('dashboard')}
         onLogout={handleLogout}
@@ -199,7 +227,7 @@ export default function App() {
                         'bg-pink-500/20 text-pink-300 border border-pink-500/40'
                       }`}
                     >
-                      {r === 'admin' ? '👑 Admin' : r === 'coordinator' ? '📋 Coordinator' : '🎓 Student'}
+                      {r === 'admin' ? 'Admin' : r === 'coordinator' ? 'Coordinator' : 'Student'}
                     </span>
                   ))}
                 </div>
@@ -337,7 +365,7 @@ export default function App() {
               Holographic Delegate Pass
             </h2>
             <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
-              Generate, tilt, inspect, and export your digital credential for the LBRCE Lakshya 2026 festival.
+              Generate, tilt, inspect, and export your digital credential for the LBRCE Lakshya 2027 festival.
             </p>
           </div>
 
@@ -379,11 +407,14 @@ export default function App() {
         />
       )}
 
-      {/* Role-Based Login & Auth Modal */}
+      {/* Role-Based Login & Auth Modal (fresh state per open; starts in
+          account-creation mode when the user arrived via Register) */}
       <LoginModal
+        key={`${isLoginOpen}-${authFlow}`}
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+        initialRegisterMode={authFlow === 'register'}
       />
     </div>
   );

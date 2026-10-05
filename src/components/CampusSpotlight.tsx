@@ -136,7 +136,7 @@ export const CampusSpotlight: React.FC = () => {
             Lakireddy Bali Reddy College of Engineering
           </h2>
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-sans">
-            Home to Lakshya 2026. A premier autonomous engineering institution spanning a picturesque 65-acre campus in Mylavaram, blending classical architectural grandeur with next-generation research arenas.
+            Home to Lakshya 2027. A premier autonomous engineering institution spanning a picturesque 65-acre campus in Mylavaram, blending classical architectural grandeur with next-generation research arenas.
           </p>
         </div>
 

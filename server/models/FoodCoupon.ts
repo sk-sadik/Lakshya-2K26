@@ -16,6 +16,10 @@ export interface IFoodCoupon extends Document {
   // Who issued the pass (admin or the event's coordinator)
   issuedBy?: string;
   issuedByEmail?: string;
+  // Email delivery tracking: once the pass is emailed to the participant it
+  // moves out of the coordinator's pending list into the received list.
+  emailed?: boolean;
+  emailedAt?: Date;
   mealType: string;
   mealDescription: string;
   venue: string;
@@ -90,6 +94,15 @@ const FoodCouponSchema = new Schema<IFoodCoupon>(
       type: String,
       lowercase: true,
       trim: true,
+    },
+    emailed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    emailedAt: {
+      type: Date,
+      default: null,
     },
     mealType: {
       type: String,

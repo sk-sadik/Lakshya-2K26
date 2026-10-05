@@ -161,9 +161,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
   // Registrations specific to this student
   const myRegistrations = useMemo(() => {
-    const userEmail = user.email.toLowerCase();
+    const userEmail = (user.email || '').toLowerCase();
     return registrations.filter(
-      r => r.studentId === user.id || r.studentEmail.toLowerCase() === userEmail
+      r => r && (r.studentId === user.id || (r.studentEmail || '').toLowerCase() === userEmail)
     );
   }, [registrations, user.id, user.email]);
 
@@ -187,9 +187,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   // Filtered Events
   const filteredEvents = useMemo(() => {
     return events.filter(e => {
-      const matchSearch = e.eventName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          e.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          e.venue.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = (e.eventName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (e.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (e.venue || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchDept = selectedDeptFilter === 'all' || e.department === selectedDeptFilter;
       const matchCategory = selectedCategoryFilter === 'all' || e.category === selectedCategoryFilter;
       return matchSearch && matchDept && matchCategory;
@@ -279,7 +279,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         key: order.key,
         amount: order.amount,
         currency: order.currency,
-        name: 'LBRCE Lakshya 2026',
+        name: 'LBRCE Lakshya 2027',
         description: `Event Registration: ${order.eventName}`,
         order_id: order.id,
         prefill: {
@@ -464,7 +464,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             </div>
             <div>
               <span className="font-heading font-extrabold text-white text-base tracking-wider block">
-                LAKSHYA 2026
+                LAKSHYA 2027
               </span>
               <span className="text-[10px] font-mono text-pink-400 uppercase font-semibold">
                 Student Portal
@@ -482,7 +482,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             <div className="overflow-hidden">
               <span className="text-sm font-bold text-white block truncate">{user.name}</span>
               <span className="text-[10px] font-mono text-purple-300/80 block truncate">
-                {user.rollNo || user.department.toUpperCase()} • {user.college.split(' (')[0]}
+                {user.rollNo || (user.department || '').toUpperCase()} • {(user.college || '').split(' (')[0]}
               </span>
             </div>
           </div>
@@ -666,7 +666,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                       : 'bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-pink-900/50'
                   }`}
                 >
-                  {r === 'admin' ? '👑 Admin' : r === 'coordinator' ? '📋 Coordinator' : '🎓 Student'}
+                  {r === 'admin' ? 'Admin' : r === 'coordinator' ? 'Coordinator' : 'Student'}
                 </button>
               ))}
             </div>
@@ -693,7 +693,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <div className="max-w-2xl relative z-10">
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="text-xs font-mono uppercase text-pink-400 tracking-wider font-semibold">
-                    Lakshya 2026 Student Dashboard
+                    Lakshya 2027 Student Dashboard
                   </span>
                   <span className="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                     LBRCE Mylavaram
@@ -1212,7 +1212,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                                     key: order.key,
                                     amount: order.amount,
                                     currency: order.currency,
-                                    name: 'LBRCE Lakshya 2026',
+                                    name: 'LBRCE Lakshya 2027',
                                     description: `Registration: ${reg.eventName}`,
                                     order_id: order.id,
                                     handler: async (resp: any) => {
@@ -1554,7 +1554,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     8 Department Arenas
                   </span>
                   <span className="px-2.5 py-1 rounded-full bg-purple-950 border border-purple-800/50 text-purple-300">
-                    Venue of Lakshya 2026
+                    Venue of Lakshya 2027
                   </span>
                 </div>
               </div>

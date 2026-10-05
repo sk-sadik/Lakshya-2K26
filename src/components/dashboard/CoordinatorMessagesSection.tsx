@@ -67,6 +67,8 @@ export const CoordinatorMessagesSection: React.FC<CoordinatorMessagesSectionProp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const ownEvents: ManagedEvent[] = useMemo(() => {
     const all = dbService.getEvents();
+    // Admins see every event here too (backend enforces the same).
+    if ((currentUser.roles || []).includes('admin')) return all;
     const mine = all.filter(
       (e) =>
         (e as any).coordinator === currentUser.id ||

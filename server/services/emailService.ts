@@ -80,9 +80,9 @@ const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 function parseSender(from: string, fallbackEmail: string): { name: string; email: string } {
   const match = from.match(/^(.*)<([^>]+)>\s*$/);
   if (match) {
-    return { name: match[1].trim().replace(/^"|"$/g, '') || 'LBRCE Lakshya 2026', email: match[2].trim() || fallbackEmail };
+    return { name: match[1].trim().replace(/^"|"$/g, '') || 'LBRCE Lakshya 2027', email: match[2].trim() || fallbackEmail };
   }
-  return { name: 'LBRCE Lakshya 2026', email: from.includes('@') ? from.trim() : fallbackEmail };
+  return { name: 'LBRCE Lakshya 2027', email: from.includes('@') ? from.trim() : fallbackEmail };
 }
 
 async function sendViaBrevoHttpApi(options: {
@@ -132,12 +132,12 @@ async function sendViaBrevoHttpApi(options: {
 
 export async function sendOTPEmail(options: SendOTPOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const { to, name, otp, purpose } = options;
-  const from = process.env.EMAIL_FROM || `"LBRCE Lakshya 2026" <${process.env.EMAIL_USER || 'fest@lbrce.ac.in'}>`;
+  const from = process.env.EMAIL_FROM || `"LBRCE Lakshya 2027" <${process.env.EMAIL_USER || 'fest@lbrce.ac.in'}>`;
 
   const subjectMap = {
-    verification: 'Verify Your Email — LBRCE Lakshya 2026',
-    reset: 'Password Reset OTP — LBRCE Lakshya 2026',
-    change_password: 'Security Verification OTP — LBRCE Lakshya 2026',
+    verification: 'Verify Your Email — LBRCE Lakshya 2027',
+    reset: 'Password Reset OTP — LBRCE Lakshya 2027',
+    change_password: 'Security Verification OTP — LBRCE Lakshya 2027',
   };
 
   const titleMap = {
@@ -147,12 +147,12 @@ export async function sendOTPEmail(options: SendOTPOptions): Promise<{ success: 
   };
 
   const descMap = {
-    verification: 'Thank you for registering for Lakshya 2026 National Level Symposium. Use the 6-digit OTP below to verify your email address and activate your account.',
-    reset: 'We received a request to reset the password for your Lakshya 2026 account. Use the 6-digit OTP below to proceed.',
+    verification: 'Thank you for registering for Lakshya 2027 National Level Symposium. Use the 6-digit OTP below to verify your email address and activate your account.',
+    reset: 'We received a request to reset the password for your Lakshya 2027 account. Use the 6-digit OTP below to proceed.',
     change_password: 'A request was made to update your account password. Confirm this action with the 6-digit security OTP below.',
   };
 
-  const subject = subjectMap[purpose] || 'Lakshya 2026 Verification OTP';
+  const subject = subjectMap[purpose] || 'Lakshya 2027 Verification OTP';
   const title = titleMap[purpose] || 'One-Time Passcode';
   const desc = descMap[purpose] || 'Your requested verification code is below:';
 
@@ -182,7 +182,7 @@ export async function sendOTPEmail(options: SendOTPOptions): Promise<{ success: 
     <body>
       <div class="container">
         <div class="header">
-          <h1>Lakshya 2026</h1>
+          <h1>Lakshya 2027</h1>
           <p>Lakireddy Bali Reddy College of Engineering (Autonomous)</p>
         </div>
         <div class="content">
@@ -197,7 +197,7 @@ export async function sendOTPEmail(options: SendOTPOptions): Promise<{ success: 
           </div>
         </div>
         <div class="footer">
-          &copy; 2026 LBRCE Lakshya Fest Committee. Mylavaram, Krishna Dist, Andhra Pradesh - 521230.<br/>
+          &copy; 2027 LBRCE Lakshya Fest Committee. Mylavaram, Krishna Dist, Andhra Pradesh - 521230.<br/>
           This is an automated security transmission. Do not reply directly to this email.
         </div>
       </div>
@@ -246,13 +246,13 @@ export async function sendOTPEmail(options: SendOTPOptions): Promise<{ success: 
 
 export async function sendFoodCouponEmail(options: SendFoodCouponOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const { to, name, couponCode, mealType, mealDescription, venue, expiryDate, qrCodeDataUrl } = options;
-  const from = process.env.EMAIL_FROM || `"LBRCE Lakshya 2026" <${process.env.EMAIL_USER || 'fest@lbrce.ac.in'}>`;
+  const from = process.env.EMAIL_FROM || `"LBRCE Lakshya 2027" <${process.env.EMAIL_USER || 'fest@lbrce.ac.in'}>`;
   const formattedExpiry = new Date(expiryDate).toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
 
-  const subject = `🍽️ Lakshya 2026 Official Food Pass — ${couponCode}`;
+  const subject = `🍽️ Lakshya 2027 Official Food Pass — ${couponCode}`;
 
   const html = `
     <!DOCTYPE html>
@@ -260,7 +260,7 @@ export async function sendFoodCouponEmail(options: SendFoodCouponOptions): Promi
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Lakshya 2026 Food Coupon Pass</title>
+      <title>Lakshya 2027 Food Coupon Pass</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #060312; color: #ffffff; margin: 0; padding: 24px; }
         .container { max-width: 580px; margin: 0 auto; background: #0e0a26; border: 1px solid #059669; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 48px rgba(0,0,0,0.7); }
@@ -295,13 +295,13 @@ export async function sendFoodCouponEmail(options: SendFoodCouponOptions): Promi
     <body>
       <div class="container">
         <div class="header">
-          <h1>Lakshya 2026</h1>
+          <h1>Lakshya 2027</h1>
           <p>Lakireddy Bali Reddy College of Engineering (Autonomous)</p>
           <span class="badge">OFFICIAL DINING PASS</span>
         </div>
         <div class="content">
           <div class="greeting">Greetings, ${name}!</div>
-          <div class="subtitle">Here is your verified complimentary food and refreshments pass for the Lakshya 2026 National Level Symposium.</div>
+          <div class="subtitle">Here is your verified complimentary food and refreshments pass for the Lakshya 2027 National Level Symposium.</div>
 
           <div class="coupon-card">
             <div class="coupon-label">UNIQUE FOOD COUPON CODE</div>
@@ -343,8 +343,8 @@ export async function sendFoodCouponEmail(options: SendFoodCouponOptions): Promi
           </div>
         </div>
         <div class="footer">
-          &copy; 2026 LBRCE Lakshya Hospitality Committee. Mylavaram, Krishna Dist, AP - 521230.<br/>
-          This pass is issued exclusively for registered Lakshya 2026 attendees. Non-transferable.
+          &copy; 2027 LBRCE Lakshya Hospitality Committee. Mylavaram, Krishna Dist, AP - 521230.<br/>
+          This pass is issued exclusively for registered Lakshya 2027 attendees. Non-transferable.
         </div>
       </div>
     </body>

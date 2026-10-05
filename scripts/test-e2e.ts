@@ -34,7 +34,7 @@ function computeRazorpaySignature(orderId: string, paymentId: string, secret: st
 
 async function runE2ETests() {
   console.log('====================================================');
-  console.log('🧪 RUNNING COMPREHENSIVE LAKSHYA 2026 E2E SUITE');
+  console.log('🧪 RUNNING COMPREHENSIVE LAKSHYA 2027 E2E SUITE');
   console.log('====================================================\n');
 
   const { connectDB } = await import('../server/config/db');
@@ -216,7 +216,7 @@ async function runE2ETests() {
 
   // 18. Official Cryptographic Payment Verification -> Success
   const testPaymentId = `pay_${Date.now()}`;
-  const secretKey = process.env.RAZORPAY_KEY_SECRET || 'rzp_test_secret_lakshya2026Key';
+  const secretKey = process.env.RAZORPAY_KEY_SECRET || 'rzp_test_secret_lakshya2027Key';
   const validSignature = computeRazorpaySignature(paymentOrder.id, testPaymentId, secretKey);
 
   const validVerify = await req('/payment/verify', {

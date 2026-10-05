@@ -145,9 +145,12 @@ export async function createCoordinatorEvent(req: AuthenticatedRequest, res: Res
       isPaid,
       coordinator: req.user._id,
       coordinatorName: req.body.coordinatorName || req.user.name,
-      coordinatorEmail: req.body.coordinatorEmail || req.user.email.toLowerCase(),
+      coordinatorEmail: (req.user.email || '').toLowerCase(),
       department: req.body.department || req.user.department || 'cse',
       registeredCount: 0,
+      // New coordinator events start pending review; only admins approve.
+      // Never trust counts/ownership/approval from the client body.
+      approvalStatus: 'pending',
     });
 
     // Update coordinator's events managed in User (or Coordinator)

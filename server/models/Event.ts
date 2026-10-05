@@ -97,7 +97,7 @@ const EventSchema = new Schema<IEvent>(
     },
     date: {
       type: String,
-      default: 'Feb 20-21, 2026',
+      default: 'Feb 20-21, 2027',
     },
     time: {
       type: String,
@@ -109,7 +109,7 @@ const EventSchema = new Schema<IEvent>(
     },
     registrationDeadline: {
       type: String,
-      default: '2026-12-31T23:59:59Z',
+      default: '2027-12-31T23:59:59Z',
     },
     entryFee: {
       type: String,

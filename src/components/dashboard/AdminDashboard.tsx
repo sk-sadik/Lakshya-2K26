@@ -152,7 +152,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [evDept, setEvDept] = useState<DepartmentId>('cse');
   const [evCategory, setEvCategory] = useState<EventCategory>('technical');
   const [evCoord, setEvCoord] = useState('');
-  const [evDate, setEvDate] = useState('2026-03-20');
+  const [evDate, setEvDate] = useState('2027-03-20');
   const [evTime, setEvTime] = useState('10:00 AM - 01:00 PM');
   const [evVenue, setEvVenue] = useState('');
   const [evDeadline, setEvDeadline] = useState(defaultRegistrationDeadline);
@@ -226,11 +226,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     loadSystemData();
   }, []);
 
-  // Auto-refresh registrations/coupons whenever the admin navigates to those tabs
+  // Refresh live data whenever the admin navigates: dashboard graphs, reports,
+  // colleges, user lists and registrations always reflect current MongoDB state.
   useEffect(() => {
-    if (activeTab === 'registrations' || activeTab === 'food-tokens') {
-      loadSystemData();
-    }
+    loadSystemData();
   }, [activeTab]);
 
   // Filtered Users
@@ -572,7 +571,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setEvDept('cse');
       setEvCategory('technical');
       setEvCoord(coordinatorsList[0]?.id || user.id);
-      setEvDate('2026-03-20');
+      setEvDate('2027-03-20');
       setEvTime('10:00 AM - 01:00 PM');
       setEvVenue('Auditorium / Lab');
       setEvDeadline(defaultRegistrationDeadline());
@@ -697,7 +696,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
             <div>
               <span className="font-heading font-extrabold text-white text-base tracking-wider block">
-                LAKSHYA 2026
+                LAKSHYA 2027
               </span>
               <span className="text-[10px] font-mono text-cyan-400 uppercase font-semibold">
                 Super Admin Portal
@@ -970,7 +969,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       : 'bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-purple-900/50'
                   }`}
                 >
-                  {r === 'admin' ? '👑 Admin' : r === 'coordinator' ? '📋 Coordinator' : '🎓 Student'}
+                  {r === 'admin' ? 'Admin' : r === 'coordinator' ? 'Coord' : 'Student'}
                 </button>
               ))}
             </div>
@@ -1155,7 +1154,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Department-Wise Registration Volume
                 </h3>
                 <p className="text-xs text-slate-400 mb-4">
-                  Total student enrollments across each of the 9 engineering branches.
+                  Total student enrollments across all 10 departments.
                 </p>
 
                 <div className="h-64 w-full">
@@ -1255,17 +1254,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span className="text-2xl font-tech font-bold text-white mt-0.5 block">{usersList.length}</span>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-purple-900/40">
-                <span className="text-[10px] font-mono text-cyan-400 uppercase block">👑 Administrators</span>
+                <span className="text-[10px] font-mono text-cyan-400 uppercase block">Administrators</span>
                 <span className="text-2xl font-tech font-bold text-cyan-400 mt-0.5 block">
                   {usersList.filter(u => (Array.isArray(u.roles) && u.roles.includes('admin')) || u.role === 'admin').length}
                 </span>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-purple-900/40">
-                <span className="text-[10px] font-mono text-purple-400 uppercase block">📋 Co-ordinators</span>
+                <span className="text-[10px] font-mono text-purple-400 uppercase block">Co-ordinators</span>
                 <span className="text-2xl font-tech font-bold text-purple-400 mt-0.5 block">{coordinatorsList.length}</span>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-purple-900/40">
-                <span className="text-[10px] font-mono text-pink-400 uppercase block">🎓 Students / Participants</span>
+                <span className="text-[10px] font-mono text-pink-400 uppercase block">Students / Participants</span>
                 <span className="text-2xl font-tech font-bold text-pink-400 mt-0.5 block">{studentsList.length}</span>
               </div>
             </div>
@@ -1303,7 +1302,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <tr>
                       <th className="p-4">User Details</th>
                       <th className="p-4">Contact Info</th>
-                      <th className="p-4">3 Types of Access (Click to Toggle)</th>
+                      <th className="p-4">Access Types (Click to Toggle): Student • Coordinator • Admin</th>
                       <th className="p-4">Institution & Dept</th>
                       <th className="p-4">Status</th>
                       <th className="p-4 text-right">Actions</th>
@@ -1343,7 +1342,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     : 'bg-slate-900/60 text-slate-500 border border-slate-800 hover:text-slate-300 hover:border-slate-700'
                                 }`}
                               >
-                                {hasAdmin ? '👑 Admin' : '+ Admin'}
+                                {hasAdmin ? 'Admin' : '+ Admin'}
                               </button>
 
                               {/* Coordinator toggle */}
@@ -1357,7 +1356,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     : 'bg-slate-900/60 text-slate-500 border border-slate-800 hover:text-slate-300 hover:border-slate-700'
                                 }`}
                               >
-                                {hasCoord ? '📋 Coord' : '+ Coord'}
+                                {hasCoord ? 'Coord' : '+ Coord'}
                               </button>
 
                               {/* Student toggle */}
@@ -1371,7 +1370,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     : 'bg-slate-900/60 text-slate-500 border border-slate-800 hover:text-slate-300 hover:border-slate-700'
                                 }`}
                               >
-                                {hasStudent ? '🎓 Student' : '+ Student'}
+                                {hasStudent ? 'Student' : '+ Student'}
                               </button>
                             </div>
                           </td>
@@ -1605,7 +1604,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Quick Metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-purple-900/40">
-                <span className="text-[10px] font-mono text-purple-300 uppercase block">Total Co-ordinators</span>
+                <span className="text-[10px] font-mono text-purple-300 uppercase block">Co-ordinators</span>
                 <span className="text-2xl font-tech font-bold text-white mt-0.5 block">{coordinatorsList.length}</span>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-purple-900/40">
@@ -1708,7 +1707,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       'bg-pink-500/20 text-pink-300 border border-pink-500/40'
                                     }`}
                                   >
-                                    {r === 'admin' ? '👑 Admin' : r === 'coordinator' ? '📋 Coord' : '🎓 Student'}
+                  {r === 'admin' ? 'Admin' : r === 'coordinator' ? 'Coordinator' : 'Student'}
                                   </span>
                                 ))}
                               </div>
@@ -2158,10 +2157,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   EVENT PARTICIPANTS ONLY
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-white font-heading">
-                  Generate Food Tokens (One Pass per Event Registration)
+                  Generate to All Coordinators
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Generates one dining pass per confirmed event registration across all events — a student in 3 events receives 3 passes. Already-issued passes are skipped. Coordinators then email their own event's passes to participants. Students without event registrations are automatically excluded.
+                  Issues one dining pass per confirmed event registration across all events — a student in 3 events receives 3 passes. This enables food-token access for every coordinator: each coordinator then emails their own event's passes to participants. Already-issued passes are skipped. Students without event registrations are automatically excluded.
                 </p>
 
                 <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -2193,7 +2192,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <span>
                       {isBulkGeneratingTokens
                         ? 'Scanning Registrations & Dispatching...'
-                        : 'Generate Tokens for All Event Participants'}
+                        : 'Generate to All Coordinators'}
                     </span>
                   </button>
 
@@ -2381,6 +2380,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <th className="p-4">Registered Email</th>
                       <th className="p-4">Institution</th>
                       <th className="p-4">Status</th>
+                      <th className="p-4">Mailed</th>
                       <th className="p-4">Issued At</th>
                       <th className="p-4">Redemption Details</th>
                     </tr>
@@ -2390,10 +2390,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       .filter((c) => {
                         const q = tokenSearch.toLowerCase();
                         const matchSearch =
-                          c.couponCode.toLowerCase().includes(q) ||
-                          c.userName.toLowerCase().includes(q) ||
-                          c.userEmail.toLowerCase().includes(q) ||
-                          c.college.toLowerCase().includes(q) ||
+                          (c.couponCode || '').toLowerCase().includes(q) ||
+                          (c.userName || '').toLowerCase().includes(q) ||
+                          (c.userEmail || '').toLowerCase().includes(q) ||
+                          (c.college || '').toLowerCase().includes(q) ||
                           (c.eventName || '').toLowerCase().includes(q);
                         const matchStatus = tokenStatusFilter === 'all' || c.status === tokenStatusFilter;
                         return matchSearch && matchStatus;
@@ -2413,7 +2413,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             {coupon.userEmail}
                           </td>
                           <td className="p-4 text-slate-400 font-sans truncate max-w-[200px]">
-                            {coupon.college.split(' (')[0]}
+                            {(coupon.college || '').split(' (')[0]}
                           </td>
                           <td className="p-4">
                             <span
@@ -2427,6 +2427,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             >
                               {coupon.status}
                             </span>
+                          </td>
+                          <td className="p-4">
+                            {coupon.emailed ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                                Sent
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-500/20 text-slate-300 border border-slate-500/40">
+                                Pending
+                              </span>
+                            )}
                           </td>
                           <td className="p-4 text-slate-400 text-[11px]">
                             {new Date(coupon.generatedDate || coupon.createdAt || Date.now()).toLocaleDateString()}
@@ -2446,7 +2457,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                     {adminFoodCoupons.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="p-8 text-center text-slate-400 font-sans">
+                        <td colSpan={9} className="p-8 text-center text-slate-400 font-sans">
                           No participant food tokens generated yet. Click "Generate Tokens for All Event Participants" above to issue tokens.
                         </td>
                       </tr>
@@ -2562,6 +2573,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-900/30">
                   <span className="text-slate-400 block mb-1">Cross-Event Participation:</span>
                   <span className="text-2xl font-bold text-emerald-400">{analytics.registrations.multiEventStudentsCount}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+                <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-900/30">
+                  <span className="text-slate-400 block mb-1">Confirmed Registrations:</span>
+                  <span className="text-2xl font-bold text-emerald-400">{analytics.registrations.confirmed}</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-900/30">
+                  <span className="text-slate-400 block mb-1">Paid Registrations:</span>
+                  <span className="text-2xl font-bold text-cyan-400">{analytics.registrations.paid}</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-900/30">
+                  <span className="text-slate-400 block mb-1">Pending Payments:</span>
+                  <span className="text-2xl font-bold text-amber-400">{analytics.registrations.pending}</span>
                 </div>
               </div>
             </div>
@@ -2732,7 +2757,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Lakireddy Bali Reddy College of Engineering (Autonomous)
                 </h4>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Mylavaram, Krishna District, Andhra Pradesh. Administrative block overseeing National Techno-Cultural Fest Lakshya 2026.
+                  Mylavaram, Krishna District, Andhra Pradesh. Administrative block overseeing National Techno-Cultural Fest Lakshya 2027.
                 </p>
               </div>
             </div>
@@ -2811,7 +2836,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {/* Student Access */}
                     <button
                       type="button"
-                      onClick={() => {
+                        onClick={() => {
                         if (userFormRoles.includes('student')) {
                           if (userFormRoles.length > 1) setUserFormRoles(userFormRoles.filter(r => r !== 'student'));
                         } else {
@@ -2825,7 +2850,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs">🎓 Student</span>
+                        <span className="font-bold text-xs">Student Access</span>
                         <input
                           type="checkbox"
                           checked={userFormRoles.includes('student')}
@@ -2834,14 +2859,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         />
                       </div>
                       <span className="text-[10px] font-mono text-slate-400 mt-1">
-                        Register, passes & events
+                        Student functionality — event registration, passes & events
                       </span>
                     </button>
 
                     {/* Coordinator Access */}
                     <button
                       type="button"
-                      onClick={() => {
+                        onClick={() => {
                         if (userFormRoles.includes('coordinator')) {
                           if (userFormRoles.length > 1) setUserFormRoles(userFormRoles.filter(r => r !== 'coordinator'));
                         } else {
@@ -2855,7 +2880,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs">📋 Co-ordinator</span>
+                        <span className="font-bold text-xs">Coordinator Access</span>
                         <input
                           type="checkbox"
                           checked={userFormRoles.includes('coordinator')}
@@ -2864,14 +2889,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         />
                       </div>
                       <span className="text-[10px] font-mono text-slate-400 mt-1">
-                        Manage events & attendees
+                        Coordinator functionality — manage events & attendees
                       </span>
                     </button>
 
                     {/* Admin Access */}
                     <button
                       type="button"
-                      onClick={() => {
+                        onClick={() => {
                         if (userFormRoles.includes('admin')) {
                           if (userFormRoles.length > 1) setUserFormRoles(userFormRoles.filter(r => r !== 'admin'));
                         } else {
@@ -2885,7 +2910,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs">👑 Admin</span>
+                        <span className="font-bold text-xs">Admin Access</span>
                         <input
                           type="checkbox"
                           checked={userFormRoles.includes('admin')}
@@ -2894,7 +2919,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         />
                       </div>
                       <span className="text-[10px] font-mono text-slate-400 mt-1">
-                        Super-admin portal rights
+                        Full administrative functionality — super-admin portal rights
                       </span>
                     </button>
                   </div>
@@ -3178,14 +3203,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {selectedUserHistory.email} • {selectedUserHistory.college}
               </p>
 
-              {registrationsList.filter(r => r.studentEmail.toLowerCase() === selectedUserHistory.email.toLowerCase()).length === 0 ? (
+              {registrationsList.filter(r => (r.studentEmail || '').toLowerCase() === selectedUserHistory.email.toLowerCase()).length === 0 ? (
                 <div className="py-6 text-center text-slate-400 text-xs">
                   No event registrations found on record for this user.
                 </div>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {registrationsList
-                    .filter(r => r.studentEmail.toLowerCase() === selectedUserHistory.email.toLowerCase())
+                    .filter(r => (r.studentEmail || '').toLowerCase() === selectedUserHistory.email.toLowerCase())
                     .map((r) => (
                       <div key={r.id} className="p-3 rounded-xl bg-purple-950/20 border border-purple-900/30 text-xs font-mono flex justify-between items-center">
                         <div>

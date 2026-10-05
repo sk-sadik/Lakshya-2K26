@@ -1,11 +1,11 @@
 {
   "info": {
-    "name": "Lakshya 2026 Website API",
-    "description": "Generated from the Lakshya-2K26 repo. Set baseUrl and jwt variables before running authenticated calls.",
+    "name": "Lakshya 2027 Website API",
+    "description": "Generated from the Lakshya-2K27 repo. Set baseUrl and jwt variables before running authenticated calls.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "https://lakshya2k26.onrender.com" },
+    { "key": "baseUrl", "value": "https://lakshya2K27.onrender.com" },
     { "key": "jwt", "value": "PASTE_JWT_HERE" },
     { "key": "eventId", "value": "cse-1" },
     { "key": "registrationId", "value": "PASTE_REGISTRATION_ID" }

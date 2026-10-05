@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User, IUser } from '../models/User';
 import { Coordinator, ICoordinator } from '../models/Coordinator';
+import { getJwtSecret } from '../config/env';
 
 export type AuthUser = IUser | ICoordinator;
 
@@ -22,8 +23,7 @@ export async function protect(req: AuthenticatedRequest, res: Response, next: Ne
   }
 
   try {
-    const secret = process.env.JWT_SECRET || 'lakshya_jwt_secure_secret_hash_production_2026';
-    const decoded = jwt.verify(token, secret) as { id: string; roles: string[] };
+    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] }) as { id: string; roles: string[] };
 
     // Check if it's a coordinator or regular user
     let user: AuthUser | null;
@@ -108,8 +108,7 @@ export async function optionalAuth(req: AuthenticatedRequest, _res: Response, ne
   }
 
   try {
-    const secret = process.env.JWT_SECRET || 'lakshya_jwt_secure_secret_hash_production_2026';
-    const decoded = jwt.verify(token, secret) as { id: string; roles: string[] };
+    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] }) as { id: string; roles: string[] };
 
     let user: AuthUser | null = await User.findById(decoded.id) as AuthUser;
     if (!user) {

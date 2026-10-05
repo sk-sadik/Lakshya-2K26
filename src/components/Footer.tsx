@@ -42,7 +42,7 @@ export const Footer: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-xl font-extrabold font-heading text-white">
-                  LAKSHYA 2026
+                  LAKSHYA 2027
                 </h3>
                 <p className="text-[11px] font-mono text-pink-400 uppercase tracking-wider">
                   National Symposium
@@ -119,10 +119,10 @@ export const Footer: React.FC = () => {
         {/* Bottom copyright line */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500">
           <p>
-            © 2026 Lakireddy Bali Reddy College of Engineering. All Rights Reserved.
+            © 2027 Lakireddy Bali Reddy College of Engineering. All Rights Reserved.
           </p>
           <div className="flex items-center gap-2">
-            <span>Crafted for Lakshya 2026 with</span>
+            <span>Crafted for Lakshya 2027 with</span>
             <Heart className="w-3.5 h-3.5 text-pink-500 fill-pink-500" />
             <span className="text-purple-300/80">by Brights of F-Section</span>
           </div>

@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const MAX_ATTEMPTS = 4;
 
 async function attempt(): Promise<void> {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/lakshya2026';
+  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/lakshya2027';
   const conn = await mongoose.connect(uri, {
     maxPoolSize: 100, // Efficiently handles 1000+ concurrent incoming requests
     minPoolSize: 10,

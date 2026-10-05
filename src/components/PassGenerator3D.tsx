@@ -95,11 +95,11 @@ export const PassGenerator3D: React.FC<PassGenerator3DProps> = ({
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 52px Orbitron, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('LAKSHYA 2026', 400, 110);
+      ctx.fillText('LAKSHYA 2027', 400, 110);
 
       ctx.fillStyle = '#fce7f3';
       ctx.font = '24px Rajdhani, sans-serif';
-      ctx.fillText('LBRCE NATIONAL LEVEL TECH FEST • 2026', 400, 160);
+      ctx.fillText('LBRCE NATIONAL LEVEL TECH FEST • 2027', 400, 160);
 
       // Pass Type Badge (Participant tier only)
       ctx.fillStyle = '#06b6d4';
@@ -355,10 +355,10 @@ export const PassGenerator3D: React.FC<PassGenerator3DProps> = ({
                   <div className="flex items-center justify-between border-b border-purple-900/50 pb-3 mb-4">
                     <div>
                       <p className="text-[10px] font-mono text-purple-300/80 uppercase tracking-widest">
-                        LBRCE FEST 2026
+                        LBRCE FEST 2027
                       </p>
                       <h4 className="text-xl font-black font-heading tracking-wider text-white">
-                        LAKSHYA 2026
+                        LAKSHYA 2027
                       </h4>
                     </div>
                     <span className={`px-2.5 py-1 rounded-md text-[11px] font-tech font-bold uppercase tracking-wider border ${roleStyles.badge}`}>
@@ -411,7 +411,7 @@ export const PassGenerator3D: React.FC<PassGenerator3DProps> = ({
                   </div>
                   <div className="text-right">
                     <span className="text-[9px] font-mono text-slate-500 block leading-tight">
-                      LAKSHYA 2026<br />SYMPOSIUM
+                      LAKSHYA 2027<br />SYMPOSIUM
                     </span>
                   </div>
                 </div>

@@ -97,7 +97,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState<DepartmentId>((user.department as DepartmentId) || 'cse');
   const [category, setCategory] = useState<EventCategory>('technical');
-  const [date, setDate] = useState('2026-03-20');
+  const [date, setDate] = useState('2027-03-20');
   const [time, setTime] = useState('10:00 AM - 01:00 PM');
   const [venue, setVenue] = useState('');
   const [deadline, setDeadline] = useState(defaultRegistrationDeadline);
@@ -152,11 +152,86 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
   const [coordNotifications, setCoordNotifications] = useState<NotificationItem[]>([]);
   const [coordReports, setCoordReports] = useState<SupportReport[]>([]);
 
-  // Load data
+  // Load data — always from the server so graphs/cards reflect live MongoDB
+  // state (never from stale local caches). Registrations come from the
+  // scoped admin endpoint: the backend returns only this coordinator's events.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const loadData = async () => {
-    const stats = dbService.getCoordinatorAnalytics(user.id, user.email);
-    setAnalytics(stats);
-    setAllEvents(stats.events);
+    setLoadError(null);
+    try {
+      const evts = await dbService.syncEvents();
+      if (evts && evts.length > 0) setAllEvents(evts);
+    } catch (err: any) {
+      setLoadError(err?.message || 'Could not reach the server for events.');
+    }
+    const freshEvents = dbService.getEvents();
+    // Admins viewing the coordinator console see every event (backend also
+    // returns unscoped data for admins). Pure coordinators see only the events
+    // they own (by id or coordinator email), falling back to their department.
+    const isAdminView = (user.roles || []).includes('admin');
+    const mine = freshEvents.filter(
+      (e) =>
+        (e as any).coordinator === user.id ||
+        (e.coordinatorEmail || '').toLowerCase() === (user.email || '').toLowerCase()
+    );
+    const useEvents = isAdminView
+      ? freshEvents
+      : mine.length > 0
+        ? mine
+        : freshEvents.filter((e) => e.department === user.department);
+    const ownIds = new Set(useEvents.map((e) => e.id));
+
+    let regs: Registration[] = [];
+    try {
+      const allRegs = await dbService.getAllRegistrationsAdmin();
+      regs = (allRegs || []).filter((r) => r && ownIds.has(r.eventId));
+    } catch (err: any) {
+      setLoadError(err?.message || 'Could not reach the server for registrations.');
+    }
+
+    const isConfirmed = (r: Registration) => r.status === 'confirmed' || (r as any).registrationStatus === 'CONFIRMED';
+    const confirmed = regs.filter(isConfirmed);
+    const paid = regs.filter((r) => r.paymentStatus === 'PAID');
+    const pending = regs.filter((r) => r.paymentStatus === 'PENDING');
+    const isLbrce = (c?: string) => /lakireddy bali reddy|lbrce/i.test(c || '');
+    const lbrceRegs = confirmed.filter((r) => isLbrce(r.college));
+    const otherRegs = confirmed.filter((r) => !isLbrce(r.college));
+    const collegeMap: Record<string, number> = {};
+    confirmed.forEach((r) => {
+      const col = (r.college || 'Other').trim() || 'Other';
+      collegeMap[col] = (collegeMap[col] || 0) + 1;
+    });
+    const collegeBreakdown = Object.entries(collegeMap)
+      .map(([college, count]) => ({
+        college: college.replace(' (Autonomous)', '').replace(', Vijayawada', '').replace(', Guntur', ''),
+        fullName: college,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+    const eventBreakdown = useEvents.map((ev) => ({
+      id: ev.id,
+      name: ev.eventName,
+      registrations: confirmed.filter((r) => r.eventId === ev.id).length,
+      maxParticipants: ev.maxParticipants,
+    }));
+
+    setAnalytics({
+      totalEvents: useEvents.length,
+      totalRegistrations: regs.length,
+      confirmedRegistrations: confirmed.length,
+      paidRegistrations: paid.length,
+      pendingRegistrations: pending.length,
+      lbrceCount: lbrceRegs.length,
+      otherCount: otherRegs.length,
+      participatingCollegesCount: Object.keys(collegeMap).length,
+      collegeBreakdown,
+      eventBreakdown,
+      participants: regs,
+      events: useEvents,
+    });
+    setAllEvents(useEvents);
+    setLastUpdatedAt(new Date().toLocaleTimeString());
     
     // Load food coupons
     try {
@@ -201,13 +276,20 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
     loadData();
   }, [user.id, user.email]);
 
+  // Refresh live numbers whenever the coordinator opens a data tab.
+  useEffect(() => {
+    if (activeTab === 'dashboard' || activeTab === 'participants' || activeTab === 'manage-registrations' || activeTab === 'statistics') {
+      loadData();
+    }
+  }, [activeTab]);
+
   const resetForm = () => {
     setEditingEvent(null);
     setEventName('');
     setDescription('');
     setDepartment((user.department as DepartmentId) || 'cse');
     setCategory('technical');
-    setDate('2026-03-20');
+    setDate('2027-03-20');
     setTime('10:00 AM - 01:00 PM');
     setVenue('');
     setDeadline(defaultRegistrationDeadline());
@@ -452,16 +534,19 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
     requestDeleteEvent(id, name);
   };
 
-  // Filtered participants list for coordinator's events
+  // Filtered participants list for coordinator's events (null-safe: one
+  // malformed record must never crash the dashboard)
   const participants = useMemo(() => {
     if (!analytics) return [];
     return (analytics.participants as Registration[]).filter((p) => {
-      const matchSearch = p.studentName.toLowerCase().includes(participantSearch.toLowerCase()) ||
-                          p.studentEmail.toLowerCase().includes(participantSearch.toLowerCase()) ||
-                          p.college.toLowerCase().includes(participantSearch.toLowerCase()) ||
-                          p.id.toLowerCase().includes(participantSearch.toLowerCase());
+      if (!p) return false;
+      const q = participantSearch.toLowerCase();
+      const matchSearch = ((p.studentName || '').toLowerCase().includes(q)) ||
+                          ((p.studentEmail || '').toLowerCase().includes(q)) ||
+                          ((p.college || '').toLowerCase().includes(q)) ||
+                          ((p.id || '').toLowerCase().includes(q));
       const matchEvent = participantEventFilter === 'all' || p.eventId === participantEventFilter;
-      const isLBRCE = p.college.includes('Lakireddy Bali Reddy');
+      const isLBRCE = (p.college || '').includes('Lakireddy Bali Reddy');
       const matchCollege = participantCollegeFilter === 'all' || 
                            (participantCollegeFilter === 'lbrce' && isLBRCE) ||
                            (participantCollegeFilter === 'other' && !isLBRCE);
@@ -478,6 +563,10 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
     ];
   }, [analytics]);
 
+  // Food passes split: emailed ones leave the pending list for the received list
+  const pendingCoupons = useMemo(() => coordFoodCoupons.filter((c) => !c.emailed), [coordFoodCoupons]);
+  const receivedCoupons = useMemo(() => coordFoodCoupons.filter((c) => c.emailed), [coordFoodCoupons]);
+
   const COLORS = ['#ec4899', '#06b6d4', '#a855f7', '#3b82f6', '#10b981'];
 
   return (
@@ -492,7 +581,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
             </div>
             <div>
               <span className="font-heading font-extrabold text-white text-base tracking-wider block">
-                LAKSHYA 2026
+                LAKSHYA 2027
               </span>
               <span className="text-[10px] font-mono text-purple-400 uppercase font-semibold">
                 Coordinator Console
@@ -712,6 +801,19 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
           </div>
         )}
 
+        {/* Load error banner (server unreachable / forbidden) with retry */}
+        {loadError && (
+          <div className="mb-6 p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-mono font-bold shadow-xl border animate-in fade-in slide-in-from-top-2 duration-200 bg-red-950/80 border-red-500/50 text-red-300">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>Live data failed to load: {loadError}</span>
+            </div>
+            <button onClick={() => { SoundEngine.playClick(); loadData(); }} className="px-3 py-1.5 rounded-xl bg-red-900/50 hover:bg-red-900 text-white cursor-pointer shrink-0">
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Multi-Role Quick Switcher Banner */}
         {availableRoles && availableRoles.length > 1 && onSwitchRole && (
           <div className="mb-6 p-3 rounded-2xl bg-gradient-to-r from-purple-950/60 to-slate-900 border border-purple-800/40 flex flex-wrap items-center justify-between gap-3 text-xs backdrop-blur-md">
@@ -733,7 +835,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                       : 'bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-purple-900/50'
                   }`}
                 >
-                  {r === 'admin' ? '👑 Admin' : r === 'coordinator' ? '📋 Coordinator' : '🎓 Student'}
+                  {r === 'admin' ? 'Admin' : r === 'coordinator' ? 'Coordinator' : 'Student'}
                 </button>
               ))}
             </div>
@@ -753,6 +855,18 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
               <p className="text-xs sm:text-sm text-slate-300">
                 Real-time tracking of managed events, registrations, participant colleges, and live check-in capacity.
               </p>
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  onClick={() => { SoundEngine.playClick(); loadData(); }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-900/50 text-purple-300 text-[11px] font-mono flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh live data</span>
+                </button>
+                {lastUpdatedAt && (
+                  <span className="text-[10px] font-mono text-slate-500">Updated {lastUpdatedAt}</span>
+                )}
+              </div>
             </div>
 
             {/* Dynamic Metric Cards */}
@@ -1167,6 +1281,14 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                 <PlusCircle className="w-4 h-4" />
                 <span>Add Event</span>
               </button>
+              <button
+                onClick={() => { SoundEngine.playClick(); loadData(); }}
+                title="Refresh my events from server"
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-900/50 text-purple-300 text-xs font-tech font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Refresh</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1259,6 +1381,14 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
               </div>
 
               <div className="flex items-center gap-2 text-xs font-mono text-purple-300">
+                <button
+                  onClick={() => { SoundEngine.playClick(); loadData(); }}
+                  title="Refresh participant list from server"
+                  className="px-3 py-1.5 rounded-xl bg-purple-950/50 border border-purple-800/40 hover:bg-purple-900/50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh</span>
+                </button>
                 <span className="px-3 py-1.5 rounded-xl bg-purple-950/50 border border-purple-800/40">
                   Showing {participants.length} Registrations
                 </span>
@@ -1362,7 +1492,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                       </tr>
                     ) : (
                       participants.map((p) => {
-                        const isLBRCE = p.college.includes('Lakireddy Bali Reddy');
+                        const isLBRCE = (p.college || '').includes('Lakireddy Bali Reddy');
                         return (
                           <tr key={p.id} className="hover:bg-purple-950/20 transition-colors">
                             <td className="p-4 font-mono font-bold text-cyan-400">{p.id}</td>
@@ -1447,6 +1577,15 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
               <p className="text-xs sm:text-sm text-slate-300">
                 In-depth metrics on student origins, college distributions, and capacity utilization.
               </p>
+              <div className="mt-2">
+                <button
+                  onClick={() => { SoundEngine.playClick(); loadData(); }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-900/50 text-purple-300 text-[11px] font-mono flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh statistics</span>
+                </button>
+              </div>
             </div>
 
             {/* College-wise distribution list */}
@@ -1607,10 +1746,10 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
 
                   <button
                     onClick={async () => {
-                      if (coordFoodCoupons.length === 0) {
+                      if (pendingCoupons.length === 0) {
                         setCouponActionFeedback({
                           type: 'error',
-                          text: 'No food passes issued yet. Ask the admin to release tokens for confirmed participants first.',
+                          text: 'No pending passes to email. Generate passes per event first.',
                         });
                         return;
                       }
@@ -1625,6 +1764,8 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                           type: 'success',
                           text: res.message,
                         });
+                        const cpnData = await dbService.getAllFoodCoupons();
+                        setCoordFoodCoupons(cpnData.coupons || []);
                       } catch (err: any) {
                         SoundEngine.playClick();
                         setCouponActionFeedback({
@@ -1643,7 +1784,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                   </button>
 
                   <span className="text-[11px] font-mono text-slate-400">
-                    {coordFoodCoupons.length} issued pass(es) ready to dispatch
+                    {pendingCoupons.length} pending pass(es) ready to dispatch
                   </span>
                 </div>
               </div>
@@ -1735,16 +1876,16 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
               </form>
             </div>
 
-            {/* Issued Food Passes (Generated by Admin) */}
+            {/* Pending Food Passes (to email) */}
             <div className="rounded-3xl bg-slate-950/80 border border-emerald-900/40 overflow-hidden shadow-xl">
               <div className="p-5 border-b border-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="font-heading font-bold text-base text-white flex items-center gap-2">
                     <Utensils className="w-4 h-4 text-emerald-400" />
-                    Issued Food Passes (Generated by Admin)
+                    Pending Food Passes ({pendingCoupons.length})
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Review tokens generated by the admin and email each pass directly to the participant's mailbox.
+                    Email each pass to the participant's mailbox. Emailed passes move to the received section below.
                   </p>
                 </div>
                 <button
@@ -1774,14 +1915,14 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-purple-950/50 font-mono">
-                    {coordFoodCoupons.length === 0 ? (
+                    {pendingCoupons.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
-                          No food passes for your events yet. Generate them per event above.
+                          No pending passes. Generate them per event above — emailed passes appear below.
                         </td>
                       </tr>
                     ) : (
-                      coordFoodCoupons.map((c) => {
+                      pendingCoupons.map((c) => {
                         const cpnId = c.id || c.couponCode;
                         const isSendingThis = isSendingCouponEmail && sendingCouponId === cpnId;
                         return (
@@ -1812,8 +1953,10 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                                       SoundEngine.playSuccess();
                                       setCouponActionFeedback({
                                         type: 'success',
-                                        text: `Food pass emailed to ${c.userEmail}!`,
+                                        text: `Food pass emailed to ${c.userEmail}! Moved to received section.`,
                                       });
+                                      const cpnData = await dbService.getAllFoodCoupons();
+                                      setCoordFoodCoupons(cpnData.coupons || []);
                                     } catch (err: any) {
                                       SoundEngine.playClick();
                                       setCouponActionFeedback({
@@ -1844,6 +1987,65 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
               </div>
             </div>
 
+            {/* Tokens Received by Participants (already emailed) */}
+            <div className="rounded-3xl bg-slate-950/80 border border-cyan-900/40 overflow-hidden shadow-xl">
+              <div className="p-5 border-b border-cyan-950">
+                <h3 className="font-heading font-bold text-base text-white flex items-center gap-2">
+                  <MailCheck className="w-4 h-4 text-cyan-400" />
+                  Tokens Received by Participants ({receivedCoupons.length})
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Passes already emailed to participants. They stay here for tracking and venue redemption.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[620px] text-left text-xs font-sans">
+                  <thead className="bg-purple-950/40 text-purple-300 font-mono text-[11px] uppercase border-b border-purple-900/50">
+                    <tr>
+                      <th className="p-4">Coupon Code</th>
+                      <th className="p-4">Event</th>
+                      <th className="p-4">Participant</th>
+                      <th className="p-4">Email</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4 text-right">Emailed On</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-purple-950/50 font-mono">
+                    {receivedCoupons.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
+                          Nothing emailed yet. Passes move here once sent to participants.
+                        </td>
+                      </tr>
+                    ) : (
+                      receivedCoupons.map((c) => (
+                        <tr key={c.id || c.couponCode} className="hover:bg-purple-950/20 transition-colors">
+                          <td className="p-4 font-bold text-emerald-300">{c.couponCode}</td>
+                          <td className="p-4 font-sans font-medium text-cyan-300">{c.eventName || '—'}</td>
+                          <td className="p-4 font-sans font-medium text-white">{c.userName}</td>
+                          <td className="p-4 text-slate-300">{c.userEmail}</td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              c.status === 'ACTIVE'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : c.status === 'USED'
+                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                                : 'bg-red-500/20 text-red-300 border border-red-500/40'
+                            }`}>
+                              {c.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right text-slate-300">
+                            {c.emailedAt ? new Date(c.emailedAt).toLocaleString() : '—'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* Display Looked Up Coupon */}
             {lookedUpCoupon && (
               <div className="p-6 sm:p-8 rounded-3xl bg-slate-950/90 border border-emerald-500/40 space-y-6 animate-in slide-in-from-bottom-2">
@@ -1856,7 +2058,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
                       {lookedUpCoupon.userName}
                     </h3>
                     <p className="text-xs text-slate-300">
-                      {lookedUpCoupon.userEmail} • {lookedUpCoupon.college.split(' (')[0]}
+                      {lookedUpCoupon.userEmail} • {(lookedUpCoupon.college || '').split(' (')[0]}
                     </p>
                   </div>
 
