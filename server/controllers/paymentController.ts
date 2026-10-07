@@ -405,6 +405,10 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response): P
 // FAIL-CLOSED: the request is rejected unless the webhook secret is configured,
 // a signature is present and valid (HMAC-SHA256 over the RAW request body),
 // and the payload parses. Only then is anything processed.
+//
+// Handled events (everything else is logged + acknowledged):
+// - payment.captured / order.paid -> confirm the matching registration (idempotent)
+// - payment.failed            -> mark a still-PENDING registration FAILED (never touches PAID/CONFIRMED)
 export async function paymentWebhook(req: Request, res: Response): Promise<void> {
   try {
     const webhookSecret = (process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
@@ -416,6 +420,7 @@ export async function paymentWebhook(req: Request, res: Response): Promise<void>
 
     const signature = req.headers['x-razorpay-signature'];
     if (!signature || typeof signature !== 'string' || signature.length === 0) {
+      console.warn('[Webhook] Rejected: missing x-razorpay-signature header.');
       res.status(400).json({ status: 'missing_signature' });
       return;
     }
@@ -433,6 +438,7 @@ export async function paymentWebhook(req: Request, res: Response): Promise<void>
     const expBuf = Buffer.from(expected, 'utf8');
     const actBuf = Buffer.from(signature, 'utf8');
     if (expBuf.length !== actBuf.length || !crypto.timingSafeEqual(expBuf, actBuf)) {
+      console.warn('[Webhook] Rejected: invalid signature.');
       res.status(400).json({ status: 'invalid_signature' });
       return;
     }
@@ -441,70 +447,130 @@ export async function paymentWebhook(req: Request, res: Response): Promise<void>
     try {
       payload = JSON.parse(rawBody.toString('utf8'));
     } catch {
+      console.warn('[Webhook] Rejected: malformed JSON payload.');
       res.status(400).json({ status: 'malformed_payload' });
       return;
     }
 
     // Signature is valid from here on — process the event.
     const event = payload?.event;
-    if (event !== 'payment.captured') {
+    if (event === 'payment.captured' || event === 'order.paid') {
+      const entity = event === 'payment.captured' ? payload?.payload?.payment?.entity : payload?.payload?.order?.entity;
+      // order.paid carries the order entity (no payment id); payment.captured carries the payment entity.
+      const orderId =
+        event === 'payment.captured'
+          ? typeof entity?.order_id === 'string'
+            ? entity.order_id
+            : null
+          : typeof entity?.id === 'string'
+            ? entity.id
+            : null;
+      const paymentId =
+        event === 'payment.captured' && typeof entity?.id === 'string' ? entity.id : null;
+      const capturedOk =
+        event === 'order.paid'
+          ? entity?.status === 'paid' || typeof entity?.amount_paid === 'number'
+          : entity?.status === 'captured';
+      console.log(`[Webhook] event=${event} order=${orderId || 'n/a'} payment=${paymentId || 'n/a'} sig=valid`);
+      if (!orderId) {
+        res.status(200).json({ status: 'ok' });
+        return;
+      }
+      if (event === 'payment.captured' && !capturedOk) {
+        console.log(`[Webhook] payment not captured (status=${entity?.status}); ignoring order=${orderId}.`);
+        res.status(200).json({ status: 'ok' });
+        return;
+      }
+      const outcome = await confirmRegistrationForOrder(orderId, paymentId, event);
+      console.log(`[Webhook] ${event} order=${orderId} outcome=${outcome}.`);
       res.status(200).json({ status: 'ok' });
       return;
     }
 
-    const payment = payload?.payload?.payment?.entity;
-    const orderId = typeof payment?.order_id === 'string' ? payment.order_id : null;
-    const paymentId = typeof payment?.id === 'string' ? payment.id : null;
-    if (!orderId || !paymentId || payment?.status !== 'captured') {
-      res.status(200).json({ status: 'ok' });
-      return;
-    }
-
-    const reg = await Registration.findOne({ paymentOrderId: orderId });
-    if (!reg) {
-      // Unknown order: acknowledge so Razorpay stops retrying, but change nothing.
-      res.status(200).json({ status: 'ok' });
-      return;
-    }
-
-    const qr = await generateRegistrationQR(reg._id.toString(), reg.eventId, reg.studentId);
-    const updated = await Registration.findOneAndUpdate(
-      {
-        paymentOrderId: orderId,
-        paymentStatus: { $ne: 'PAID' },
-      },
-      {
-        $set: {
-          paymentStatus: 'PAID',
-          registrationStatus: 'CONFIRMED',
-          paymentId,
-          qrToken: qr.token,
-          qrCodeDataUrl: qr.dataUrl,
-        },
-      },
-      { new: true }
-    );
-
-    if (updated) {
-      // Capacity-gated increment, mirroring verifyPayment.
-      const eventDoc = await Event.findById(reg.event);
-      const capped = !!eventDoc && eventDoc.maxParticipants > 0;
-      if (!capped) {
-        await Event.findByIdAndUpdate(reg.event, { $inc: { registeredCount: 1 } });
-      } else {
-        await Event.findOneAndUpdate(
-          {
-            _id: reg.event,
-            $expr: { $lt: ['$registeredCount', '$maxParticipants'] },
-          },
-          { $inc: { registeredCount: 1 } }
+    if (event === 'payment.failed') {
+      const entity = payload?.payload?.payment?.entity;
+      const orderId = typeof entity?.order_id === 'string' ? entity.order_id : null;
+      console.log(`[Webhook] event=payment.failed order=${orderId || 'n/a'} sig=valid`);
+      if (orderId) {
+        // Only flip still-PENDING registrations; PAID/CONFIRMED are never touched.
+        const flipped = await Registration.findOneAndUpdate(
+          { paymentOrderId: orderId, paymentStatus: 'PENDING', registrationStatus: 'PENDING' },
+          { $set: { paymentStatus: 'FAILED' } },
+          { new: true }
+        );
+        console.log(
+          flipped
+            ? `[Webhook] payment.failed order=${orderId}: registration marked FAILED.`
+            : `[Webhook] payment.failed order=${orderId}: no pending registration found, nothing changed.`
         );
       }
+      res.status(200).json({ status: 'ok' });
+      return;
     }
 
+    console.log(`[Webhook] Ignoring unhandled event type: ${event}.`);
     res.status(200).json({ status: 'ok' });
   } catch (error: any) {
     console.error('[Webhook Error]', error?.message || error);
     res.status(500).json({ status: 'error' });
   }
+}
+
+/**
+ * Shared idempotent confirm used by payment.captured AND order.paid.
+ * Finds the registration by stored order id, flips it to PAID/CONFIRMED exactly
+ * once (compare-and-swap), generates the QR badge, and claims one seat behind
+ * a capacity gate. Repeat deliveries change nothing (no double count, no dupes).
+ */
+async function confirmRegistrationForOrder(
+  orderId: string,
+  paymentId: string | null,
+  source: string
+): Promise<'confirmed' | 'already' | 'unknown-order'> {
+  const reg = await Registration.findOne({ paymentOrderId: orderId });
+  if (!reg) {
+    // Unknown order: caller acknowledges so Razorpay stops retrying; nothing changes.
+    console.log(`[Webhook] ${source} order=${orderId}: no matching registration, ignoring.`);
+    return 'unknown-order';
+  }
+
+  const qr = await generateRegistrationQR(reg._id.toString(), reg.eventId, reg.studentId);
+  const updated = await Registration.findOneAndUpdate(
+    {
+      paymentOrderId: orderId,
+      paymentStatus: { $ne: 'PAID' },
+    },
+    {
+      $set: {
+        paymentStatus: 'PAID',
+        registrationStatus: 'CONFIRMED',
+        paymentId: paymentId || reg.paymentId,
+        qrToken: qr.token,
+        qrCodeDataUrl: qr.dataUrl,
+      },
+    },
+    { new: true }
+  );
+
+  if (!updated) {
+    console.log(`[Webhook] ${source} order=${orderId}: already PAID, skipping (idempotent).`);
+    return 'already';
+  }
+
+  // Capacity-gated increment, mirroring verifyPayment.
+  const eventDoc = await Event.findById(reg.event);
+  const capped = !!eventDoc && eventDoc.maxParticipants > 0;
+  if (!capped) {
+    await Event.findByIdAndUpdate(reg.event, { $inc: { registeredCount: 1 } });
+  } else {
+    await Event.findOneAndUpdate(
+      {
+        _id: reg.event,
+        $expr: { $lt: ['$registeredCount', '$maxParticipants'] },
+      },
+      { $inc: { registeredCount: 1 } }
+    );
+  }
+  console.log(`[Webhook] ${source} order=${orderId}: registration CONFIRMED.`);
+  return 'confirmed';
 }

@@ -14,7 +14,7 @@ services:
       - key: PORT
         value: 10000
       - key: FRONTEND_URL
-        value: https://lakshya-2027.onrender.com
+        value: https://lakshya2k26.onrender.com
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
@@ -34,4 +34,8 @@ services:
       - key: RAZORPAY_KEY_ID
         sync: false
       - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: BREVO_API_KEY
         sync: false
